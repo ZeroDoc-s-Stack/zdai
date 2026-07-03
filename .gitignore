@@ -2,3 +2,4 @@ zdai
 *.log
 *.lock
 .env
+vendor/
