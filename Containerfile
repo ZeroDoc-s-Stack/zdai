@@ -22,23 +22,22 @@ COPY --from=build /zdai /usr/local/bin/zdai
 COPY --from=claude-install /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=claude-install /usr/local/bin/claude /usr/local/bin/claude
 
-# Entrypoint: clones zerodoctor/zdclaude into /root/.claude on first run,
-# then execs zdai. GITHUB_TOKEN must be provided at runtime via the Nomad job.
+# Entrypoint: merges zerodoctor/zdclaude (agents/skills) into /root/.claude without
+# wiping existing auth credentials, then exec's zdai. GITHUB_TOKEN is required on
+# first run if /root/.claude/agents/ is not already present.
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# /vault   — Obsidian vault  (/mnt/local/syncthing/data1 on vp0dune)
-# /scripts — ~/scripts clone  (/mnt/local/zdai/scripts or direct mount)
-# /state   — run.lock, runs.log, zdai-state.json, tess-last-run
-# /root/.claude — zdclaude clone (persistent volume; populated by entrypoint on first run)
-VOLUME ["/vault", "/scripts", "/state", "/root/.claude"]
+# /vault        — Obsidian vault  (/mnt/local/syncthing/data1 on vp0dune)
+# /state        — run.lock, runs.log, zdai-state.json, tess-last-run
+# /root/.claude — persistent Claude Max session + agents/skills from zdclaude
+VOLUME ["/vault", "/state", "/root/.claude"]
 
 ENV VAULT_DIR=/vault \
-    SCRIPTS_DIR=/scripts \
     STATE_DIR=/state \
-    TASKNOTES_MCP_URL=http://host.containers.internal:8080/mcp \
+    PORT=8080 \
     ZDCLAUDE_REPO=https://github.com/ZeroDoctor/zdclaude
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh", \
-    "--vault-dir", "/vault", \
-    "--state-dir", "/state"]
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
