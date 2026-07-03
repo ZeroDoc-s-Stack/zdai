@@ -1,0 +1,4 @@
+zdai
+*.log
+*.lock
+.env
