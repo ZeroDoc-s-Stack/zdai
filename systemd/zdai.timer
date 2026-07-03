@@ -1,0 +1,12 @@
+[Unit]
+Description=zdai agent-harness dispatcher timer
+Requires=zdai.service
+
+[Timer]
+# Fire at :07, :22, :37, :52 every hour between 08:00 and 22:00.
+OnCalendar=*-*-* 08..22:07,22,37,52:00
+Persistent=true
+Unit=zdai.service
+
+[Install]
+WantedBy=timers.target

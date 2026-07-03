@@ -1,0 +1,26 @@
+[Unit]
+Description=zdai agent-harness dispatcher
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Secrets are read from the environment; export them in ~/.config/environment.d/
+# or set them via a systemd override (systemctl --user edit zdai.service).
+EnvironmentFile=-%h/.config/zdai/env
+ExecStart=/usr/bin/podman run --rm \
+  --name zdai-run \
+  --userns=keep-id \
+  -v /mnt/v1drive/syncthing/data1:/vault:ro,z \
+  -v %h/scripts:/scripts:ro,z \
+  -v %h/.local/state/zdai:/state:z \
+  -e ANTHROPIC_API_KEY \
+  -e OPENROUTER_API_KEY \
+  -e GIT_COMMIT \
+  --add-host=host.containers.internal:host-gateway \
+  ghcr.io/zerodoc-s-stack/zdai:latest
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
