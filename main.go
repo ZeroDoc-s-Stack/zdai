@@ -21,7 +21,9 @@ import (
 
 var log = logger.Log
 
-const defaultVaultDir = "/mnt/v1drive/syncthing/data1"
+// defaultVaultDir is the Obsidian vault root on vp0dune (Syncthing target).
+// Override via --vault-dir or the VAULT_DIR env var for other hosts.
+const defaultVaultDir = "/mnt/local/syncthing/data1"
 const defaultStateDir = "" // resolved to ~/.local/state/zdai at runtime
 
 func main() {

@@ -1,17 +1,18 @@
-# Development override: mounts ~/.claude so agent and skill changes take
-# effect immediately without rebuilding the image.
+# Development override for local testing.
+# Production scheduling is via Nomad (zdnomad); systemd/ units are dev-only.
 #
 # Usage:  podman-compose -f compose.dev.yml up
 services:
   zdai:
     image: zdai-dev
     volumes:
-      - /mnt/v1drive/syncthing/data1:/vault:ro
+      - /mnt/local/syncthing/data1:/vault:ro       # vp0dune vault path
       - /home/zerodoc/scripts:/scripts:ro
       - /home/zerodoc/.local/state/zdai:/state
-      - /home/zerodoc/.claude:/root/.claude   # override baked agents/skills
+      - /home/zerodoc/.claude:/root/.claude         # dev: skip zdclaude clone
     environment:
       - ANTHROPIC_API_KEY
       - OPENROUTER_API_KEY
+      - GITHUB_TOKEN
       - TASKNOTES_MCP_URL=http://host.containers.internal:8080/mcp
     network_mode: host
