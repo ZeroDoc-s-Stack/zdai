@@ -1,31 +1,29 @@
-// Pre-filters which agent-harness items are actually eligible for this cycle
-// (per Harness/SKILL.md step 0 and 1.2/1.3) before the AI is invoked, so the
-// prompt doesn't hand it the whole queue and a cycle with nothing eligible can
-// skip AI invocation entirely.
+// Pre-filters which agent-harness items are eligible for this dispatch cycle
+// by reading the vault's TaskNotes/Tasks/ directory directly. No MCP server
+// dependency — pure Go file parsing of YAML frontmatter.
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
-const defaultMCPURL = "http://localhost:8080/mcp"
+// taskFrontmatter holds the subset of fields we need from a task note.
+type taskFrontmatter struct {
+	Status      string   `yaml:"status"`
+	DateCreated string   `yaml:"dateCreated"`
+	Tags        []string `yaml:"tags"`
+}
 
-type taskSummary struct {
-	Path        string   `json:"path"`
-	Title       string   `json:"title"`
-	Status      string   `json:"status"`
-	DateCreated string   `json:"dateCreated"`
-	Tags        []string `json:"tags"`
+// taskEntry is a task file with its parsed metadata.
+type taskEntry struct {
+	path string
+	fm   taskFrontmatter
 }
 
 var (
@@ -33,111 +31,82 @@ var (
 	agentStatusRe       = regexp.MustCompile(`(?m)^-\s*(?:stage|status):\s*(\S+)\s*$`)
 )
 
-func mcpToolCall(ctx context.Context, client *http.Client, mcpURL, name string, args map[string]any) (string, error) {
-	reqBody, err := json.Marshal(map[string]any{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "tools/call",
-		"params":  map[string]any{"name": name, "arguments": args},
-	})
-	if err != nil {
-		return "", err
+// parseFrontmatter extracts the YAML frontmatter from a note file.
+func parseFrontmatter(data []byte) (taskFrontmatter, bool) {
+	s := string(data)
+	if !strings.HasPrefix(s, "---") {
+		return taskFrontmatter{}, false
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", mcpURL, bytes.NewReader(reqBody))
-	if err != nil {
-		return "", err
+	rest := s[3:]
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return taskFrontmatter{}, false
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json, text/event-stream")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
+	var fm taskFrontmatter
+	if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
+		return taskFrontmatter{}, false
 	}
-	defer resp.Body.Close()
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(resp.Body); err != nil {
-		return "", err
-	}
-
-	// The MCP server replies with an SSE-framed body ("event: message\ndata:
-	// {...}"); pull the JSON out of the "data:" line rather than parsing SSE
-	// properly, since this server only ever sends a single message per call.
-	payload := buf.Bytes()
-	for _, line := range strings.Split(buf.String(), "\n") {
-		if rest, ok := strings.CutPrefix(line, "data: "); ok {
-			payload = []byte(rest)
-			break
-		}
-	}
-
-	var envelope struct {
-		Result struct {
-			Content []struct {
-				Text string `json:"text"`
-			} `json:"content"`
-		} `json:"result"`
-		Error *struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return "", fmt.Errorf("decode mcp response: %w", err)
-	}
-	if envelope.Error != nil {
-		return "", fmt.Errorf("mcp error: %s", envelope.Error.Message)
-	}
-	if len(envelope.Result.Content) == 0 {
-		return "", fmt.Errorf("mcp response had no content")
-	}
-	return envelope.Result.Content[0].Text, nil
+	return fm, true
 }
 
-// queryByTag fetches every task carrying tag whose status is one of the four
-// CTO-actionable values from SKILL.md's eligibility query, oldest first. The
-// MCP query can't filter on the body's `## Agent State: status` (only the
-// Go side can, by reading the file), so this is the cheap first pass.
-func queryByTag(ctx context.Context, client *http.Client, mcpURL, tag string) ([]taskSummary, error) {
-	args := map[string]any{
-		"conjunction": "and",
-		"children": []map[string]any{
-			{"type": "condition", "id": "c1", "property": "tags", "operator": "contains", "value": tag},
-			{"type": "group", "id": "g1", "conjunction": "or", "children": []map[string]any{
-				{"type": "condition", "id": "c2", "property": "status", "operator": "is", "value": "open"},
-				{"type": "condition", "id": "c3", "property": "status", "operator": "is", "value": "approved"},
-				{"type": "condition", "id": "c4", "property": "status", "operator": "is", "value": "ready"},
-				{"type": "condition", "id": "c5", "property": "status", "operator": "is", "value": "needs-rework"},
-			}},
-		},
+// hasTag reports whether the frontmatter tags list contains tag.
+func hasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
 	}
-	text, err := mcpToolCall(ctx, client, mcpURL, "tasknotes_query_tasks", args)
+	return false
+}
+
+// scanTasks walks TaskNotes/Tasks/ and returns all task entries with the
+// given tag whose status is in the candidate set (open/approved/ready/needs-rework).
+func scanTasks(vaultDir, tag string) ([]taskEntry, error) {
+	tasksDir := filepath.Join(vaultDir, "TaskNotes", "Tasks")
+	entries, err := os.ReadDir(tasksDir)
 	if err != nil {
 		return nil, err
 	}
-	var result struct {
-		All []taskSummary `json:"all"`
-	}
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, fmt.Errorf("decode query_tasks result: %w", err)
+
+	eligible := map[string]bool{
+		"open": true, "approved": true, "ready": true, "needs-rework": true,
 	}
 
-	var out []taskSummary
-	for _, t := range result.All {
-		// Template/example notes carry the same tags but have an unexpanded
-		// "{{title}}" placeholder — skip them.
-		if strings.Contains(t.Title, "{{") {
+	var out []taskEntry
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		out = append(out, t)
+		data, err := os.ReadFile(filepath.Join(tasksDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		fm, ok := parseFrontmatter(data)
+		if !ok {
+			continue
+		}
+		if !eligible[fm.Status] {
+			continue
+		}
+		if !hasTag(fm.Tags, tag) {
+			continue
+		}
+		// Skip template/example notes with unexpanded placeholders.
+		if strings.Contains(string(data), "{{") {
+			continue
+		}
+		// Vault-relative path used as the identifier throughout zdai.
+		rel := filepath.Join("TaskNotes", "Tasks", e.Name())
+		out = append(out, taskEntry{path: rel, fm: fm})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].DateCreated < out[j].DateCreated })
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].fm.DateCreated < out[j].fm.DateCreated
+	})
 	return out, nil
 }
 
 // readAgentStatus reads a ticket's `## Agent State` status line from disk.
-// The body-text `stage`/`status` field (distinct from the TaskNotes frontmatter
-// `status` field, which is the CTO approval gate) drives eligibility.
 func readAgentStatus(vaultDir, path string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(vaultDir, path))
 	if err != nil {
@@ -159,32 +128,25 @@ func readAgentStatus(vaultDir, path string) (string, error) {
 	return m[1], nil
 }
 
-// readAgentKind reads the agent-kind tag from a ticket's YAML frontmatter.
-// It scans the frontmatter tags array for a value matching "agent:<name>" or
-// "agent-kind:<kind>" and returns the resolved tag value. "agent:<name>" takes
-// precedence over "agent-kind:<kind>" as a direct persona override.
+// readAgentKind reads the agent dispatch hint from a ticket's frontmatter tags.
+// "agent:<name>" (direct persona) takes precedence over "agent-kind:<kind>".
 func readAgentKind(vaultDir, path string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(vaultDir, path))
 	if err != nil {
 		return "", err
 	}
-	body := string(data)
-
-	// Find the YAML frontmatter block between the first two "---" lines.
-	if !strings.HasPrefix(body, "---") {
+	s := string(data)
+	if !strings.HasPrefix(s, "---") {
 		return "", nil
 	}
-	rest := body[3:]
+	rest := s[3:]
 	end := strings.Index(rest, "\n---")
 	if end < 0 {
 		return "", nil
 	}
 	frontmatter := rest[:end]
 
-	// Scan for tag values under the `tags:` key. We look for list items
-	// (lines starting with "  - " or "- ") that match our prefixes.
-	var directAgent string
-	var kindAgent string
+	var directAgent, kindAgent string
 	for _, line := range strings.Split(frontmatter, "\n") {
 		trimmed := strings.TrimSpace(line)
 		tag, ok := strings.CutPrefix(trimmed, "- ")
@@ -192,10 +154,10 @@ func readAgentKind(vaultDir, path string) (string, error) {
 			continue
 		}
 		tag = strings.TrimSpace(tag)
-		if v, ok := strings.CutPrefix(tag, "agent:"); ok && directAgent == "" {
+		if v, ok2 := strings.CutPrefix(tag, "agent:"); ok2 && directAgent == "" {
 			directAgent = strings.TrimSpace(v)
 		}
-		if v, ok := strings.CutPrefix(tag, "agent-kind:"); ok && kindAgent == "" {
+		if v, ok2 := strings.CutPrefix(tag, "agent-kind:"); ok2 && kindAgent == "" {
 			kindAgent = strings.TrimSpace(v)
 		}
 	}
@@ -205,9 +167,7 @@ func readAgentKind(vaultDir, path string) (string, error) {
 	return kindAgent, nil
 }
 
-// ticketEligible mirrors SKILL.md step 1.2/1.3: a queued ticket is always
-// eligible; a stuck one only resumes on an explicit approved/ready/
-// needs-rework status flip, never on agentStatus alone.
+// ticketEligible mirrors harness-coordinator eligibility rules.
 func ticketEligible(agentStatus, taskStatus string) bool {
 	if taskStatus == "needs-rework" {
 		return true
@@ -224,42 +184,36 @@ func ticketEligible(agentStatus, taskStatus string) bool {
 
 const eligibilityCap = 5
 
-// eligibleWork queries both agent-request tasks and agent-queue tickets,
-// applies the eligibility rule from SKILL.md, and returns at most
-// eligibilityCap of each as vault-relative paths, oldest first.
-func eligibleWork(ctx context.Context, client *http.Client, mcpURL, vaultDir string) (requests, tickets []string, err error) {
-	requestCandidates, err := queryByTag(ctx, client, mcpURL, "agent-request")
+// eligibleWork scans the vault directly for eligible agent-request tasks and
+// agent-queue tickets. No MCP server required.
+func eligibleWork(vaultDir string) (requests, tickets []string, err error) {
+	requestCandidates, err := scanTasks(vaultDir, "agent-request")
 	if err != nil {
-		return nil, nil, fmt.Errorf("query agent-request: %w", err)
+		return nil, nil, err
 	}
 	for _, t := range requestCandidates {
-		requests = append(requests, t.Path)
+		requests = append(requests, t.path)
 		if len(requests) == eligibilityCap {
 			break
 		}
 	}
 
-	ticketCandidates, err := queryByTag(ctx, client, mcpURL, "agent-queue")
+	ticketCandidates, err := scanTasks(vaultDir, "agent-queue")
 	if err != nil {
-		return nil, nil, fmt.Errorf("query agent-queue: %w", err)
+		return nil, nil, err
 	}
 	for _, t := range ticketCandidates {
-		agentStatus, err := readAgentStatus(vaultDir, t.Path)
+		agentStatus, err := readAgentStatus(vaultDir, t.path)
 		if err != nil {
 			continue
 		}
-		if !ticketEligible(agentStatus, t.Status) {
+		if !ticketEligible(agentStatus, t.fm.Status) {
 			continue
 		}
-		tickets = append(tickets, t.Path)
+		tickets = append(tickets, t.path)
 		if len(tickets) == eligibilityCap {
 			break
 		}
 	}
-
 	return requests, tickets, nil
-}
-
-func mcpHTTPClient() *http.Client {
-	return &http.Client{Timeout: 30 * time.Second}
 }
