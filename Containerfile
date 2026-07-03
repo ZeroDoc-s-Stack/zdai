@@ -1,10 +1,11 @@
 # Stage 1: Build the zdai Go binary
+# Dependencies are vendored so the build works offline (zdlib is private).
 FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+COPY vendor vendor
 COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /zdai .
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags="-s -w" -o /zdai .
 
 # Stage 2: Install the claude CLI via npm
 FROM node:20-alpine AS claude-install

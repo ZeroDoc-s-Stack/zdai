@@ -1,0 +1,7 @@
+zdai
+*.log
+*.lock
+.env
+.git
+systemd/
+compose.dev.yml
