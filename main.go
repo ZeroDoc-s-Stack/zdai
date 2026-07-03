@@ -1,16 +1,12 @@
-// zdai is the Claude Code agent-harness orchestrator. It pre-filters eligible
-// agent-request and agent-queue tasks via the TaskNotes MCP server, dispatches
-// each directly to its persona (developer, researcher, auditor, qa, sre, tess)
-// via `claude --agent`, and fires a daily Tess note independently of the ticket
-// queue. One invocation = one full dispatch cycle; repetition is the systemd
-// timer's job.
+// zdai is the Claude Code agent-harness web service. It runs a background
+// dispatch scheduler and exposes an HTTP API for triggering agent runs and
+// querying run history. No MCP server required — vault tasks are read directly.
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
-	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -22,16 +18,15 @@ import (
 var log = logger.Log
 
 // defaultVaultDir is the Obsidian vault root on vp0dune (Syncthing target).
-// Override via --vault-dir or the VAULT_DIR env var for other hosts.
+// Override via --vault-dir or VAULT_DIR env var for other hosts.
 const defaultVaultDir = "/mnt/local/syncthing/data1"
-const defaultStateDir = "" // resolved to ~/.local/state/zdai at runtime
 
 func main() {
-	vaultDir := flag.String("vault-dir", defaultVaultDir, "working directory for claude invocations (vault root)")
-	stateDir := flag.String("state-dir", defaultStateDir, "state directory for run.lock, runs.log, zdai-state.json, tess-last-run")
-	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary to invoke")
+	vaultDir := flag.String("vault-dir", envOr("VAULT_DIR", defaultVaultDir), "Obsidian vault root")
+	stateDir := flag.String("state-dir", envOr("STATE_DIR", ""), "state directory (run.lock, runs.log, zdai-state.json)")
+	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary")
 	timeout := flag.Duration("timeout", 15*time.Minute, "max duration per claude invocation")
-	mcpURL := flag.String("mcp-url", defaultMCPURL, "TaskNotes MCP server URL for pre-filtering eligible tickets")
+	port := flag.String("port", envOr("PORT", "8080"), "HTTP listen port")
 	flag.Parse()
 
 	logger.LoadText(true)
@@ -61,67 +56,45 @@ func main() {
 
 	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		if errors.Is(err, syscall.EWOULDBLOCK) {
-			appendLog(logPath, "previous run still active, skipping", -1, 0)
-			os.Exit(0)
+			log.Fatal("zdai: another instance is already running")
 		}
 		log.Fatalf("zdai: flock: %v", err)
 	}
-	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN) //nolint:errcheck
 
-	state, err := loadState(statePath)
+	cfg, err := loadState(statePath)
 	if err != nil {
 		log.Fatalf("zdai: load zdai-state.json: %v", err)
 	}
 
 	rotateLogIfLarge(logPath)
 
-	opts := dispatchOpts{
+	// Publish runtime opts so the scheduler and HTTP handlers share them.
+	_opts = dispatchOpts{
 		vaultDir:  *vaultDir,
 		claudeBin: *claudeBin,
 		timeout:   *timeout,
 		logPath:   logPath,
-		model:     state.Harness.Model,
-		effort:    state.Harness.Effort,
-		provider:  state.Harness.Provider,
+		model:     cfg.Harness.Model,
+		effort:    cfg.Harness.Effort,
+		provider:  cfg.Harness.Provider,
 	}
 
-	// Tess daily note fires before ticket dispatch so it always runs even when
-	// ticket dispatch is lengthy.
-	if state.Tess.Enabled {
-		tessLastRunPath := filepath.Join(*stateDir, "tess-last-run")
-		if shouldRunTess(state.Tess.Schedule, tessLastRunPath) {
-			ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-			if err := runTess(ctx, state.Tess, *claudeBin, *vaultDir, logPath); err != nil {
-				log.Errorf("zdai: tess daily run: %v", err)
-			} else {
-				if err := markTessRan(tessLastRunPath); err != nil {
-					log.Errorf("zdai: mark tess ran: %v", err)
-				}
-			}
-			cancel()
-		}
-	}
+	startScheduler()
 
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-	defer cancel()
+	srv := &http.Server{
+		Addr:    ":" + *port,
+		Handler: newRouter(),
+	}
+	log.Infof("zdai: listening on :%s", *port)
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("zdai: server: %v", err)
+	}
+}
 
-	requests, tickets, err := eligibleWork(ctx, mcpHTTPClient(), *mcpURL, *vaultDir)
-	if err != nil {
-		log.Fatalf("zdai: pre-filter eligible work: %v", err)
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-	if len(requests) == 0 && len(tickets) == 0 {
-		appendLog(logPath, "no eligible agent-request tasks or agent-queue tickets this cycle; skipped claude invocation", 0, 0)
-		return
-	}
-
-	// Dispatch requests (always planner) then tickets (per agent-kind tag).
-	for _, path := range requests {
-		dispatchRequest(ctx, path, opts)
-	}
-	for _, path := range tickets {
-		if err := dispatchTicket(ctx, path, *vaultDir, opts); err != nil {
-			log.Errorf("zdai: dispatch ticket %s: %v", path, err)
-			appendLog(logPath, fmt.Sprintf("skipped %s: %v", path, err), 1, 0)
-		}
-	}
+	return fallback
 }

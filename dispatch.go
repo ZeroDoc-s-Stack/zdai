@@ -32,16 +32,6 @@ var personaByAgentKind = map[string]persona{
 // of their tags — requests are always handled by the planner.
 var requestPersona = persona{"planner", "claude-haiku-4-5-20251001"}
 
-type dispatchOpts struct {
-	vaultDir  string
-	claudeBin string
-	timeout   time.Duration
-	logPath   string
-	model     string // harness-level model override (unused for per-ticket dispatch; retained for future)
-	effort    string
-	provider  string
-}
-
 // resolvePersona returns the persona for a ticket by checking the ticket file's
 // frontmatter for an "agent:<name>" tag (direct persona override) or
 // "agent-kind:<kind>" tag (dispatch table lookup). Returns false if no
