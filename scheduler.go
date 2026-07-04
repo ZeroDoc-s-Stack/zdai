@@ -41,6 +41,11 @@ func runCycle(trigger string) {
 		return
 	}
 
+	// Email-driven ticket unblock check.
+	if _emailRouter != nil {
+		_emailRouter.checkBlockedTickets(ctx, opts.vaultDir, opts)
+	}
+
 	// Tess daily check.
 	if cfg.Tess.Enabled {
 		tessLastRun := filepath.Join(filepath.Dir(opts.logPath), "tess-last-run")

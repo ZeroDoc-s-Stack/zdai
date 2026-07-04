@@ -80,6 +80,17 @@ func main() {
 		provider:  cfg.Harness.Provider,
 	}
 
+	if cfg.EmailRouting.Enabled {
+		snapFile := filepath.Join(*stateDir, "email-thread-snapshots.json")
+		fetcher := newHTTPGmailFetcher(cfg.EmailRouting.GmailToken)
+		r, err := newEmailRouter(fetcher, snapFile)
+		if err != nil {
+			log.Fatalf("zdai: init email router: %v", err)
+		}
+		_emailRouter = r
+		log.Infof("zdai: email routing enabled, snapshots at %s", snapFile)
+	}
+
 	startScheduler()
 
 	srv := &http.Server{

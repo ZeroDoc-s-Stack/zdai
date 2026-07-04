@@ -19,9 +19,15 @@ type tessConfig struct {
 	Prompt   string `json:"prompt"`
 }
 
+type emailRoutingConfig struct {
+	Enabled    bool   `json:"enabled"`
+	GmailToken string `json:"gmail_token"` // OAuth Bearer token for zd.agents@gmail.com
+}
+
 type zdaiState struct {
-	Harness harnessConfig `json:"harness"`
-	Tess    tessConfig    `json:"tess"`
+	Harness      harnessConfig      `json:"harness"`
+	Tess         tessConfig         `json:"tess"`
+	EmailRouting emailRoutingConfig `json:"email_routing"`
 }
 
 func loadState(path string) (zdaiState, error) {
