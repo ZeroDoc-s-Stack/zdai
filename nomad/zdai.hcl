@@ -30,7 +30,7 @@ job "zdai" {
       port "broker" { to = 3002 }
 
       dns {
-        servers = ["10.0.0.6", "1.1.1.1"]
+        servers = ["10.0.0.3", "1.1.1.1"]
       }
     }
 
