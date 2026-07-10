@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package zdai;
+
+option go_package = "./proto;zdai";
+
+// Zdai is the Claude Code agent-harness service. It manages dispatch cycles,
+// run history, Tess triggers, and email-driven ticket unblocking.
+service Zdai {
+  // Health returns the service liveness status.
+  rpc HealthCall(HealthRequest) returns (HealthResponse) {}
+
+  // ListRunsCall returns all tracked dispatch runs (newest first).
+  rpc ListRunsCall(ListRunsRequest) returns (ListRunsResponse) {}
+
+  // GetRunCall returns a single run by its ID.
+  rpc GetRunCall(GetRunRequest) returns (GetRunResponse) {}
+
+  // DispatchCall triggers a full dispatch cycle immediately.
+  rpc DispatchCall(DispatchRequest) returns (DispatchResponse) {}
+
+  // AgentRunCall runs a single agent on a specific ticket path, bypassing the
+  // eligibility filter.
+  rpc AgentRunCall(AgentRunRequest) returns (AgentRunResponse) {}
+
+  // RegisterEmailThreadCall establishes a 1:1 mapping between a ticket path
+  // and a Gmail thread ID for email-driven ticket unblocking.
+  rpc RegisterEmailThreadCall(RegisterEmailThreadRequest) returns (RegisterEmailThreadResponse) {}
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1; // "ok"
+}
+
+message ListRunsRequest {}
+
+message RunRecord {
+  string id = 1;
+  string trigger = 2;
+  string started_at = 3;  // RFC3339
+  string finished_at = 4; // RFC3339; empty if still running
+  string status = 5;      // "running" | "done" | "failed"
+}
+
+message ListRunsResponse {
+  repeated RunRecord runs = 1;
+}
+
+message GetRunRequest {
+  string id = 1;
+}
+
+message GetRunResponse {
+  bool found = 1;
+  RunRecord run = 2;
+}
+
+message DispatchRequest {
+  string trigger = 1; // optional label, defaults to "api"
+}
+
+message DispatchResponse {
+  string message = 1;
+}
+
+message AgentRunRequest {
+  string path = 1; // vault-relative path to the ticket
+}
+
+message AgentRunResponse {
+  string message = 1;
+  string path = 2;
+}
+
+message RegisterEmailThreadRequest {
+  string ticket_path = 1;
+  string gmail_thread_id = 2;
+}
+
+message RegisterEmailThreadResponse {
+  string ticket_path = 1;
+  string gmail_thread_id = 2;
+}
