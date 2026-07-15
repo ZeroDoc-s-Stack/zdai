@@ -1,4 +1,4 @@
-package handler
+package controllers
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/zerodoc-s-stack/zdai/proto"
+	"github.com/zerodoc-s-stack/zdai/internal/models"
+	pb "github.com/zerodoc-s-stack/zdai/package/grpc"
 )
 
 // newTestHandler returns a Zdai handler wired with no-op or stub functions.
@@ -23,17 +24,17 @@ func newTestHandler() *Zdai {
 			}
 			return nil
 		},
-		ListRunsFn: func() []RunRecord {
-			return []RunRecord{
+		ListRunsFn: func() []models.RunRecord {
+			return []models.RunRecord{
 				{ID: "a", Trigger: "test", StartedAt: now, FinishedAt: &finished, Status: "done"},
 				{ID: "b", Trigger: "api", StartedAt: now, Status: "running"},
 			}
 		},
-		GetRunFn: func(id string) (RunRecord, bool) {
+		GetRunFn: func(id string) (models.RunRecord, bool) {
 			if id == "a" {
-				return RunRecord{ID: "a", Trigger: "test", StartedAt: now, Status: "done"}, true
+				return models.RunRecord{ID: "a", Trigger: "test", StartedAt: now, Status: "done"}, true
 			}
-			return RunRecord{}, false
+			return models.RunRecord{}, false
 		},
 	}
 }

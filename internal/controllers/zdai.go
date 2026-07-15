@@ -1,18 +1,19 @@
-package handler
+package controllers
 
 import (
 	"context"
 	"time"
 
-	"github.com/zerodoc-s-stack/zdai/logger"
-	pb "github.com/zerodoc-s-stack/zdai/proto"
+	logger "github.com/zerodoc-s-stack/zdai/internal/logger"
+	"github.com/zerodoc-s-stack/zdai/internal/models"
+	pb "github.com/zerodoc-s-stack/zdai/package/grpc"
 )
 
 var log = logger.Log
 
 // Zdai implements the gRPC handler for the zdai service.
-// Business logic (dispatch, store, email routing) lives in the main package;
-// this handler delegates to package-level vars set at startup.
+// Business logic (dispatch, store, email routing) lives in the services package;
+// this handler delegates to injected function values set at startup.
 type Zdai struct {
 	// RunCycleFn triggers a full dispatch cycle.
 	RunCycleFn func(trigger string)
@@ -23,19 +24,9 @@ type Zdai struct {
 	// EmailRoutingEnabled indicates whether email routing is active.
 	EmailRoutingEnabled bool
 	// ListRunsFn returns current run records.
-	ListRunsFn func() []RunRecord
+	ListRunsFn func() []models.RunRecord
 	// GetRunFn returns a single run by ID, or false if not found.
-	GetRunFn func(id string) (RunRecord, bool)
-}
-
-// RunRecord is a transfer object passed in from the main package store to
-// avoid an import cycle (handler → main is not possible).
-type RunRecord struct {
-	ID         string
-	Trigger    string
-	StartedAt  time.Time
-	FinishedAt *time.Time
-	Status     string
+	GetRunFn func(id string) (models.RunRecord, bool)
 }
 
 func (z *Zdai) HealthCall(_ context.Context, _ *pb.HealthRequest, resp *pb.HealthResponse) error {

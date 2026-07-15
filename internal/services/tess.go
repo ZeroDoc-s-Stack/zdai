@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"context"
@@ -41,7 +41,7 @@ func markTessRan(tessLastRunPath string) error {
 }
 
 // runTess invokes `claude --agent tess` with the configured Tess prompt.
-func runTess(ctx context.Context, cfg tessConfig, claudeBin, vaultDir, logPath string) error {
+func runTess(ctx context.Context, cfg TessConfig, claudeBin, vaultDir, logPath string) error {
 	if cfg.Prompt == "" {
 		return fmt.Errorf("tess.prompt is empty in zdai-state.json")
 	}

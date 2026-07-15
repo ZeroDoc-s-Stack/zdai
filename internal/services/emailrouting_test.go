@@ -1,4 +1,4 @@
-package main
+package services
 
 // Tests for reply-detection and latest-reply-isolation logic in emailrouting.go.
 // Does NOT exercise HTTP or file I/O — only the pure algorithmic functions.
@@ -65,10 +65,10 @@ func TestLatestUnhandledReply(t *testing.T) {
 			wantID: "i2",
 		},
 		{
-			name:   "inbound already handled via HandledUpTo",
-			msgs:   []threadMsg{msg("s1", sys, 0), msg("i1", user, 10)},
+			name:        "inbound already handled via HandledUpTo",
+			msgs:        []threadMsg{msg("s1", sys, 0), msg("i1", user, 10)},
 			handledUpTo: "i1",
-			wantID: "",
+			wantID:      "",
 		},
 		{
 			name:        "second inbound after handled first — returns second",
@@ -249,7 +249,7 @@ func TestRegisterThread_OneToOneEnforcement(t *testing.T) {
 	// Use an in-memory-only router (no real file I/O).
 	tmp := t.TempDir()
 	snapFile := filepath.Join(tmp, "snaps.json")
-	r := &emailRouter{
+	r := &EmailRouter{
 		fetcher:   nil, // not needed for registration tests
 		snapFile:  snapFile,
 		snapshots: make(map[string]threadSnapshot),
@@ -325,4 +325,3 @@ func TestParseThreadResponse_SenderExtraction(t *testing.T) {
 		t.Errorf("msgs[1].Sender = %q, want %q", msgs[1].Sender, "danielcastrolocal@gmail.com")
 	}
 }
-

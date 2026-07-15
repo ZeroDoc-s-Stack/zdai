@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"context"
@@ -93,8 +93,8 @@ func latestUnhandledReply(msgs []threadMsg, handledUpTo string) (threadMsg, bool
 // Gmail fetcher
 // -----------------------------------------------------------------------------
 
-// gmailFetcher abstracts Gmail API calls so business logic is testable without HTTP.
-type gmailFetcher interface {
+// GmailFetcher abstracts Gmail API calls so business logic is testable without HTTP.
+type GmailFetcher interface {
 	threadMessages(ctx context.Context, threadID string) ([]threadMsg, error)
 }
 
@@ -105,7 +105,8 @@ type httpGmailFetcher struct {
 	hc    *http.Client
 }
 
-func newHTTPGmailFetcher(token string) *httpGmailFetcher {
+// NewHTTPGmailFetcher returns a GmailFetcher backed by the Gmail REST API.
+func NewHTTPGmailFetcher(token string) GmailFetcher {
 	return &httpGmailFetcher{
 		token: token,
 		hc:    &http.Client{Timeout: 15 * time.Second},
@@ -195,23 +196,27 @@ func extractFromAddress(headers []gmailHeader) string {
 }
 
 // -----------------------------------------------------------------------------
-// emailRouter
+// EmailRouter
 // -----------------------------------------------------------------------------
 
-// emailRouter manages thread↔ticket mappings and drives the unblock workflow.
+// EmailRouter manages thread↔ticket mappings and drives the unblock workflow.
 // One instance lives for the lifetime of the process.
-type emailRouter struct {
+type EmailRouter struct {
 	mu        sync.Mutex
-	fetcher   gmailFetcher
-	snapFile  string                     // path to JSON file storing snapshots
-	snapshots map[string]threadSnapshot  // keyed by ticket path
+	fetcher   GmailFetcher
+	snapFile  string                    // path to JSON file storing snapshots
+	snapshots map[string]threadSnapshot // keyed by ticket path
 }
 
 // _emailRouter is the package-level instance initialised in main (nil when disabled).
-var _emailRouter *emailRouter
+var _emailRouter *EmailRouter
 
-func newEmailRouter(fetcher gmailFetcher, snapFile string) (*emailRouter, error) {
-	r := &emailRouter{
+// SetEmailRouter stores the email router instance. Called once from main.
+func SetEmailRouter(r *EmailRouter) { _emailRouter = r }
+
+// NewEmailRouter constructs an EmailRouter and loads persisted snapshots.
+func NewEmailRouter(fetcher GmailFetcher, snapFile string) (*EmailRouter, error) {
+	r := &EmailRouter{
 		fetcher:   fetcher,
 		snapFile:  snapFile,
 		snapshots: make(map[string]threadSnapshot),
@@ -222,7 +227,16 @@ func newEmailRouter(fetcher gmailFetcher, snapFile string) (*emailRouter, error)
 	return r, nil
 }
 
-func (r *emailRouter) load() error {
+// RegisterEmailThread establishes the strict 1:1 mapping between a ticket path
+// and a Gmail thread ID. No-ops when email routing is disabled.
+func RegisterEmailThread(ticketPath, gmailThreadID string) error {
+	if _emailRouter == nil {
+		return nil
+	}
+	return _emailRouter.registerThread(ticketPath, gmailThreadID)
+}
+
+func (r *EmailRouter) load() error {
 	data, err := os.ReadFile(r.snapFile)
 	if err != nil {
 		return err
@@ -237,7 +251,7 @@ func (r *emailRouter) load() error {
 	return nil
 }
 
-func (r *emailRouter) save() error {
+func (r *EmailRouter) save() error {
 	snaps := make([]threadSnapshot, 0, len(r.snapshots))
 	for _, s := range r.snapshots {
 		snaps = append(snaps, s)
@@ -253,7 +267,7 @@ func (r *emailRouter) save() error {
 // registerThread establishes the strict 1:1 mapping between a ticket path and
 // a Gmail thread ID. Returns an error if either side already maps to a
 // different partner (prevents accidental cross-wiring).
-func (r *emailRouter) registerThread(ticketPath, gmailThreadID string) error {
+func (r *EmailRouter) registerThread(ticketPath, gmailThreadID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -277,7 +291,7 @@ func (r *emailRouter) registerThread(ticketPath, gmailThreadID string) error {
 // blocked and has a registered Gmail thread, it fetches the thread, checks for
 // a new reply, and if found transitions the ticket blocked→in-progress before
 // dispatching the agent.
-func (r *emailRouter) checkBlockedTickets(ctx context.Context, vaultDir string, opts dispatchOpts) {
+func (r *EmailRouter) checkBlockedTickets(ctx context.Context, vaultDir string, opts DispatchOpts) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -330,8 +344,8 @@ func (r *emailRouter) checkBlockedTickets(ctx context.Context, vaultDir string, 
 // dispatchUnblockedTicket resolves the ticket's persona and invokes claude with
 // a prompt that names the new reply by message ID only. Body retrieval is the
 // agent's responsibility — we never include or log body content here.
-func (r *emailRouter) dispatchUnblockedTicket(ctx context.Context, ticketPath string, reply threadMsg, opts dispatchOpts) error {
-	p, ok := resolvePersona(opts.vaultDir, ticketPath)
+func (r *EmailRouter) dispatchUnblockedTicket(ctx context.Context, ticketPath string, reply threadMsg, opts DispatchOpts) error {
+	p, ok := resolvePersona(opts.VaultDir, ticketPath)
 	if !ok {
 		return fmt.Errorf("no agent-kind tag in %s", ticketPath)
 	}
@@ -343,7 +357,7 @@ func (r *emailRouter) dispatchUnblockedTicket(ctx context.Context, ticketPath st
 			"last outbound system message. Retrieve and process this reply to continue work.",
 		ticketPath, reply.MessageID, reply.Sender, reply.SentAt.UTC().Format(time.RFC3339),
 	)
-	return invokeAgent(ctx, p, prompt, opts.vaultDir, opts.claudeBin, opts.effort, opts.provider, opts.logPath)
+	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath)
 }
 
 // -----------------------------------------------------------------------------
