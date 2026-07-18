@@ -196,7 +196,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if _, err := StartMicro(ctx, h); err != nil {
+	if err := StartMicro(ctx, h); err != nil {
 		log.Fatalf("zdai: failed to start micro: %v", err)
 	}
 
