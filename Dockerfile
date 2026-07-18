@@ -1,13 +1,21 @@
-# Stage 1: Build the zdai Go binary
-# Dependencies are vendored so the build works offline (zdlib is private).
+# Stage 1: Build the zdai Go binary.
+# Private deps (zdlib) resolve via API_USERNAME/API_TOKEN build args — same
+# pattern as zdapi. A local vendor/ dir, if present, is used automatically.
 FROM golang:1.25-alpine AS build
+ARG API_USERNAME=
+ARG API_TOKEN=
 WORKDIR /src
+RUN apk add --no-cache git && \
+    git config --global --add url.https://${API_USERNAME}:${API_TOKEN}@github.com.insteadOf https://github.com && \
+    go env -w GOPRIVATE=github.com/zerodoctor/*,github.com/zerodoc-s-stack/* && \
+    go env -w GONOSUMDB=github.com/zerodoctor/*,github.com/zerodoc-s-stack/* && \
+    go env -w GONOPROXY=github.com/zerodoctor/*,github.com/zerodoc-s-stack/*
 COPY go.mod go.sum ./
-COPY vendor vendor
+RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY package/ package/
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags="-s -w" -o /zdai ./cmd/zdai/
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /zdai ./cmd/zdai/
 
 # Stage 2: Install the claude CLI via npm
 FROM node:20-alpine AS claude-install

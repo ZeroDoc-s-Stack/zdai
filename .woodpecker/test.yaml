@@ -4,7 +4,7 @@ when:
 
 matrix:
   platform:
-    - linux/arm64
+    - linux/amd64
 
 labels:
   platform: ${platform}
@@ -12,7 +12,16 @@ labels:
 steps:
   - name: test
     image: docker.io/library/golang:1.25-alpine
+    environment:
+      GITHUB_USER:
+        from_secret: github_user
+      GITHUB_TOKEN:
+        from_secret: github_token
     commands:
-      - apk add git gcc musl-dev make
-      - make build
-      - go test ./...
+    - apk add git gcc musl-dev make
+    - git config --global --add url.https://$GITHUB_USER:$GITHUB_TOKEN@github.com.insteadOf https://github.com
+    - go env -w GOPRIVATE=github.com/zerodoctor/*,github.com/zerodoc-s-stack/*
+    - go env -w GONOSUMDB=github.com/zerodoctor/*,github.com/zerodoc-s-stack/*
+    - go env -w GONOPROXY=github.com/zerodoctor/*,github.com/zerodoc-s-stack/*
+    - go build ./...
+    - go test ./...
