@@ -2,11 +2,11 @@ job "zdai" {
   datacenters = ["dc1"]
   type = "service"
 
-  affinity {
+  # vault + state volumes and the amd64 image only exist on vp0dune
+  constraint {
     attribute = "${node.unique.name}"
-    value     = "(a|m|z)[0-9]dune.*"
     operator  = "regexp"
-    weight    = -100
+    value     = "^vp[0-9]dune.*"
   }
 
   update {
@@ -16,13 +16,6 @@ job "zdai" {
   }
 
   group "zdai" {
-    affinity {
-      attribute = "${node.unique.name}"
-      value     = "zp[0-9]dune.*"
-      operator  = "regexp"
-      weight    = 100
-    }
-
     count = 1
 
     network {
@@ -65,6 +58,8 @@ job "zdai" {
         VAULT_DIR      = "/vault"
         STATE_DIR      = "/state"
         ZDCLAUDE_REPO  = "https://github.com/ZeroDoctor/zdclaude"
+        # entrypoint clones zdclaude (first run) + zdscripts (every start)
+        GITHUB_TOKEN   = "${github_token}"
 
         # ponytail: force all dispatches onto claude until the proxy serves the
         # gemini personas; remove to fall back to the persona table models
