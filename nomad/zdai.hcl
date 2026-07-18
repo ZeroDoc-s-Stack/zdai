@@ -31,7 +31,7 @@ job "zdai" {
       driver = "podman"
 
       config {
-        image = "reg.zerodoc.dev/zerodoc/zdai:main"
+        image = "reg.internal.zerodoc.dev/zerodoc/zdai:main"
         auth {
           username = "${reg_user}"
           password = "${reg_pass}"
