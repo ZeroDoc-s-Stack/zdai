@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	logger "github.com/zerodoc-s-stack/zdai/internal/logger"
+	"github.com/zerodoc-s-stack/zdlib/base/logger"
 )
 
 // log is the shared logrus instance for the services package.

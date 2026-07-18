@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	logger "github.com/zerodoc-s-stack/zdai/internal/logger"
+	"github.com/zerodoc-s-stack/zdlib/base/logger"
 	"github.com/zerodoc-s-stack/zdai/internal/models"
 	pb "github.com/zerodoc-s-stack/zdai/package/grpc"
 )
