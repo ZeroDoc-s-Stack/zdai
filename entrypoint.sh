@@ -10,7 +10,13 @@ set -e
 
 CLAUDE_DIR="${CLAUDE_DIR:-/root/.claude}"
 ZDCLAUDE_REPO="${ZDCLAUDE_REPO:-https://github.com/ZeroDoctor/zdclaude}"
+ZDSCRIPTS_REPO="${ZDSCRIPTS_REPO:-https://github.com/ZeroDoctor/zdscripts}"
+SCRIPTS_DIR="${SCRIPTS_DIR:-/root/scripts}"
 CLONE_TMP="/tmp/zdclaude-clone"
+
+auth_url() {
+    echo "$1" | sed "s|https://|https://x-access-token:${GITHUB_TOKEN}@|"
+}
 
 if [ ! -d "${CLAUDE_DIR}/agents" ]; then
     if [ -z "${GITHUB_TOKEN}" ]; then
@@ -18,7 +24,7 @@ if [ ! -d "${CLAUDE_DIR}/agents" ]; then
         exit 1
     fi
     echo "zdai: cloning zdclaude..."
-    AUTH_URL=$(echo "${ZDCLAUDE_REPO}" | sed "s|https://|https://x-access-token:${GITHUB_TOKEN}@|")
+    AUTH_URL=$(auth_url "${ZDCLAUDE_REPO}")
     rm -rf "${CLONE_TMP}"
     git clone --depth=1 "${AUTH_URL}" "${CLONE_TMP}"
 
@@ -30,6 +36,14 @@ if [ ! -d "${CLAUDE_DIR}/agents" ]; then
         cp "${CLONE_TMP}/settings.json" "${CLAUDE_DIR}/settings.json"
     rm -rf "${CLONE_TMP}"
     echo "zdai: zdclaude merged into ${CLAUDE_DIR}"
+fi
+
+# zdscripts (vault-agent.sh etc.) — not on a volume, so re-cloned each container
+# start. Non-fatal: agents fall back to node fetch for Vault if this fails.
+if [ ! -d "${SCRIPTS_DIR}" ] && [ -n "${GITHUB_TOKEN}" ]; then
+    echo "zdai: cloning zdscripts..."
+    git clone --depth=1 "$(auth_url "${ZDSCRIPTS_REPO}")" "${SCRIPTS_DIR}" ||
+        echo "zdai: WARN zdscripts clone failed — vault-agent.sh unavailable" >&2
 fi
 
 exec /usr/local/bin/zdai "$@"

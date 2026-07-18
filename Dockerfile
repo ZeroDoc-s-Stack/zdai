@@ -15,7 +15,9 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Stage 3: Runtime image
 FROM alpine:3.22
-RUN apk add --no-cache nodejs ca-certificates git
+# bash/curl/jq: required by ~/scripts (zdscripts) helpers, notably
+# sh/vault-agent.sh for non-interactive Vault access via the zdagent approle.
+RUN apk add --no-cache nodejs ca-certificates git bash curl jq
 
 # zdai binary
 COPY --from=build /zdai /usr/local/bin/zdai
