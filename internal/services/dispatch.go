@@ -55,6 +55,16 @@ func resolvePersona(vaultDir, path string) (persona, bool) {
 	return persona{agent: kind, model: "claude-sonnet-4-6"}, true
 }
 
+// overrideModel applies the ZDAI_MODEL_OVERRIDE env var, forcing every
+// dispatch onto one model without touching the persona table. Used to bypass
+// models the proxy can't serve (e.g. the google/gemini-* entries).
+func overrideModel(p persona) persona {
+	if m := os.Getenv("ZDAI_MODEL_OVERRIDE"); m != "" {
+		p.model = m
+	}
+	return p
+}
+
 func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, effort, provider, logPath string) error {
 	args := []string{
 		"--print",
@@ -111,6 +121,7 @@ func DispatchTicket(ctx context.Context, path string, vaultDir string, opts Disp
 	if !ok {
 		return fmt.Errorf("no agent-kind or agent tag found in frontmatter")
 	}
+	p = overrideModel(p)
 	log.Infof("zdai: dispatch ticket %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Execute the ticket at: %s", path)
 	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath)
@@ -118,7 +129,7 @@ func DispatchTicket(ctx context.Context, path string, vaultDir string, opts Disp
 
 // dispatchRequest dispatches an agent-request task to the planner persona.
 func dispatchRequest(ctx context.Context, path string, opts DispatchOpts) {
-	p := requestPersona
+	p := overrideModel(requestPersona)
 	log.Infof("zdai: dispatch request %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Process the agent-request at: %s", path)
 	if err := invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath); err != nil {
