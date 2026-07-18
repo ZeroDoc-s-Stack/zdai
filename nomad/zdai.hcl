@@ -65,6 +65,10 @@ job "zdai" {
         VAULT_DIR      = "/vault"
         STATE_DIR      = "/state"
         ZDCLAUDE_REPO  = "https://github.com/ZeroDoctor/zdclaude"
+
+        # ponytail: force all dispatches onto claude until the proxy serves the
+        # gemini personas; remove to fall back to the persona table models
+        ZDAI_MODEL_OVERRIDE = "claude-sonnet-4-6"
       }
     }
 
