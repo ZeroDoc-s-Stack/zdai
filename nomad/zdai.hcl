@@ -1,6 +1,6 @@
 job "zdai" {
   datacenters = ["dc1"]
-  type = "service"
+  type        = "service"
 
   # vault + state volumes and the amd64 image only exist on vp0dune
   constraint {
@@ -38,6 +38,13 @@ job "zdai" {
         }
         force_pull = true
 
+        # rootless conmon (vdune) cannot write nomad's root-owned alloc log
+        # fifo — without journald the container dies at start with
+        # "write child: broken pipe" (view logs: journalctl CONTAINER_NAME)
+        logging {
+          driver = "journald"
+        }
+
         ports = ["micro", "broker"]
 
         volumes = [
@@ -59,7 +66,7 @@ job "zdai" {
         STATE_DIR      = "/state"
         ZDCLAUDE_REPO  = "https://github.com/ZeroDoctor/zdclaude"
         # entrypoint clones zdclaude (first run) + zdscripts (every start)
-        GITHUB_TOKEN   = "${github_token}"
+        GITHUB_TOKEN = "${github_token}"
 
         # ponytail: force all dispatches onto claude until the proxy serves the
         # gemini personas; remove to fall back to the persona table models
