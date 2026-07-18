@@ -23,12 +23,12 @@ steps:
       DOCKER_PASS:
         from_secret: docker_pass
     commands:
-      - podman login reg.zerodoc.dev --username $DOCKER_USER --password $DOCKER_PASS
+      - podman login reg.internal.zerodoc.dev --username $DOCKER_USER --password $DOCKER_PASS
       - podman build
         --build-arg API_USERNAME=$GITHUB_USER
         --build-arg API_TOKEN=$GITHUB_TOKEN
         -t zdai:${CI_COMMIT_BRANCH}-stage .
       # single-arch service (vp0dune only) — push the branch tag directly
-      - podman push zdai:${CI_COMMIT_BRANCH}-stage reg.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}
+      - podman push zdai:${CI_COMMIT_BRANCH}-stage reg.internal.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}
     volumes:
     - /var/lib/containers:/var/lib/containers
