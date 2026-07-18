@@ -1,5 +1,8 @@
 zdai
+cmd/zdai/zdai
 *.log
 *.lock
 .env
+*.env
 vendor/
+

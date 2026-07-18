@@ -4,24 +4,24 @@ job "zdai" {
 
   affinity {
     attribute = "${node.unique.name}"
-    value = "(a|m|z)[0-9]dune.*"
-    operator = "regexp"
-    weight = -100
+    value     = "(a|m|z)[0-9]dune.*"
+    operator  = "regexp"
+    weight    = -100
   }
 
   update {
     max_parallel = 1
-    stagger = "20s"
-    auto_revert = true
+    stagger      = "20s"
+    auto_revert  = true
   }
 
   group "zdai" {
-		affinity {
-			attribute = "${node.unique.name}"
-      value = "zp[0-9]dune.*"
-      operator = "regexp"
-			weight = 100
-		}
+    affinity {
+      attribute = "${node.unique.name}"
+      value     = "zp[0-9]dune.*"
+      operator  = "regexp"
+      weight    = 100
+    }
 
     count = 1
 
@@ -55,16 +55,16 @@ job "zdai" {
       }
 
       env {
-        ENV="prod"
-        APPROLE_ID="${approle_id}"
-        APPROLE_SECRET="${approle_secret}"
-        GIT_COMMIT="${DRONE_COMMIT}"
-        MICRO_PORT=3001
-        BROKER_PORT=3002
-        VAULT_ADDRESS="${vault_address}"
-        VAULT_DIR="/vault"
-        STATE_DIR="/state"
-        ZDCLAUDE_REPO="https://github.com/ZeroDoctor/zdclaude"
+        ENV            = "prod"
+        APPROLE_ID     = "${approle_id}"
+        APPROLE_SECRET = "${approle_secret}"
+        GIT_COMMIT     = "${DRONE_COMMIT}"
+        MICRO_PORT     = 3001
+        BROKER_PORT    = 3002
+        VAULT_ADDRESS  = "${vault_address}"
+        VAULT_DIR      = "/vault"
+        STATE_DIR      = "/state"
+        ZDCLAUDE_REPO  = "https://github.com/ZeroDoctor/zdclaude"
       }
     }
 
@@ -77,8 +77,8 @@ job "zdai" {
       ]
 
       check {
-        name = "alive"
-        type = "tcp"
+        name     = "alive"
+        type     = "tcp"
         interval = "10s"
         timeout  = "2s"
       }

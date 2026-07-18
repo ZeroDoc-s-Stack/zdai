@@ -1,4 +1,4 @@
-package main
+package models
 
 import "time"
 
@@ -27,4 +27,14 @@ type AgentRun struct {
 	Duration  time.Duration `json:"duration_ms"` // milliseconds for JSON
 	ExitCode  int           `json:"exit_code"`
 	Output    string        `json:"output"` // last 4000 chars
+}
+
+// RunRecord is a transfer object passed between the service store and the
+// gRPC controller to avoid carrying proto types into business logic.
+type RunRecord struct {
+	ID         string
+	Trigger    string
+	StartedAt  time.Time
+	FinishedAt *time.Time
+	Status     string
 }

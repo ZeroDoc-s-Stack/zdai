@@ -1,0 +1,34 @@
+when:
+  - event: push
+    branch: [main, release, release/*]
+
+matrix:
+  platform:
+    - linux/arm64
+
+labels:
+  platform: ${platform}
+
+steps:
+  - name: build
+    image: quay.io/containers/podman
+    privileged: true
+    environment:
+      GITHUB_USER:
+        from_secret: github_user
+      GITHUB_TOKEN:
+        from_secret: github_token
+      DOCKER_USER:
+        from_secret: docker_user
+      DOCKER_PASS:
+        from_secret: docker_pass
+    commands:
+      - podman login reg.zerodoc.dev --username $DOCKER_USER --password $DOCKER_PASS
+      - podman build
+        --build-arg ENVIRON=prod
+        --build-arg API_USERNAME=$GITHUB_USER
+        --build-arg API_TOKEN=$GITHUB_TOKEN
+        -t zdai:${CI_COMMIT_BRANCH}-stage .
+      - podman push zdai:${CI_COMMIT_BRANCH}-stage reg.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}-arm64
+    volumes:
+      - /var/lib/containers:/var/lib/containers

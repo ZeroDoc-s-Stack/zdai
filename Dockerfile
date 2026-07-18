@@ -4,8 +4,10 @@ FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 COPY vendor vendor
-COPY *.go ./
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags="-s -w" -o /zdai .
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY package/ package/
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags="-s -w" -o /zdai ./cmd/zdai/
 
 # Stage 2: Install the claude CLI via npm
 FROM node:20-alpine AS claude-install

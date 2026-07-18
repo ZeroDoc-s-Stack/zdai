@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"bytes"
@@ -8,7 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	logger "github.com/zerodoc-s-stack/zdai/internal/logger"
 )
+
+// log is the shared logrus instance for the services package.
+var log *logrus.Logger = logger.Log
 
 type persona struct {
 	agent string
@@ -98,24 +104,24 @@ func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, ef
 	return nil
 }
 
-// dispatchTicket reads the ticket's agent-kind tag, resolves the persona, and
+// DispatchTicket reads the ticket's agent-kind tag, resolves the persona, and
 // invokes claude --agent <persona> with the ticket path as the prompt.
-func dispatchTicket(ctx context.Context, path string, vaultDir string, opts dispatchOpts) error {
+func DispatchTicket(ctx context.Context, path string, vaultDir string, opts DispatchOpts) error {
 	p, ok := resolvePersona(vaultDir, path)
 	if !ok {
 		return fmt.Errorf("no agent-kind or agent tag found in frontmatter")
 	}
 	log.Infof("zdai: dispatch ticket %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Execute the ticket at: %s", path)
-	return invokeAgent(ctx, p, prompt, opts.vaultDir, opts.claudeBin, opts.effort, opts.provider, opts.logPath)
+	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath)
 }
 
 // dispatchRequest dispatches an agent-request task to the planner persona.
-func dispatchRequest(ctx context.Context, path string, opts dispatchOpts) {
+func dispatchRequest(ctx context.Context, path string, opts DispatchOpts) {
 	p := requestPersona
 	log.Infof("zdai: dispatch request %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Process the agent-request at: %s", path)
-	if err := invokeAgent(ctx, p, prompt, opts.vaultDir, opts.claudeBin, opts.effort, opts.provider, opts.logPath); err != nil {
+	if err := invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath); err != nil {
 		log.Errorf("zdai: dispatch request %s: %v", path, err)
 	}
 }

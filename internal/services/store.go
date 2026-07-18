@@ -1,25 +1,29 @@
-package main
+package services
 
 import (
 	"sync"
 	"time"
+
+	"github.com/zerodoc-s-stack/zdai/internal/models"
 )
 
 const maxRuns = 100
 
-type runStore struct {
+// RunStore is an in-process ring buffer of recent dispatch runs.
+type RunStore struct {
 	mu   sync.RWMutex
-	runs []*Run
+	runs []*models.Run
 }
 
-var store = &runStore{}
+// Store is the package-level run history, initialised at startup.
+var Store = &RunStore{}
 
-func (s *runStore) begin(trigger string) *Run {
-	r := &Run{
+func (s *RunStore) Begin(trigger string) *models.Run {
+	r := &models.Run{
 		ID:        time.Now().UTC().Format("20060102T150405"),
 		Trigger:   trigger,
 		StartedAt: time.Now().UTC(),
-		Status:    RunStatusRunning,
+		Status:    models.RunStatusRunning,
 	}
 	s.mu.Lock()
 	s.runs = append(s.runs, r)
@@ -30,7 +34,7 @@ func (s *runStore) begin(trigger string) *Run {
 	return r
 }
 
-func (s *runStore) finish(r *Run, status RunStatus) {
+func (s *RunStore) Finish(r *models.Run, status models.RunStatus) {
 	t := time.Now().UTC()
 	s.mu.Lock()
 	r.FinishedAt = &t
@@ -38,21 +42,21 @@ func (s *runStore) finish(r *Run, status RunStatus) {
 	s.mu.Unlock()
 }
 
-func (s *runStore) addAgentRun(r *Run, ar AgentRun) {
+func (s *RunStore) AddAgentRun(r *models.Run, ar models.AgentRun) {
 	s.mu.Lock()
 	r.AgentRuns = append(r.AgentRuns, ar)
 	s.mu.Unlock()
 }
 
-func (s *runStore) list() []*Run {
+func (s *RunStore) List() []*models.Run {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make([]*Run, len(s.runs))
+	out := make([]*models.Run, len(s.runs))
 	copy(out, s.runs)
 	return out
 }
 
-func (s *runStore) get(id string) *Run {
+func (s *RunStore) Get(id string) *models.Run {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, r := range s.runs {

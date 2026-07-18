@@ -29,14 +29,14 @@ job "zdai" {
 
   constraint {
     attribute = "${node.unique.name}"
-    value = "tp[0-3]dune.*"
-    operator = "regexp"
+    value     = "tp[0-3]dune.*"
+    operator  = "regexp"
   }
 
   update {
     max_parallel = 1
-    stagger = "20s"
-    auto_revert = true
+    stagger      = "20s"
+    auto_revert  = true
   }
 
   group "zdai" {
@@ -72,16 +72,16 @@ job "zdai" {
       }
 
       env {
-        ENV="test"
-        APPROLE_ID="${var.approle_id}"
-        APPROLE_SECRET="${var.approle_secret}"
-        GIT_COMMIT="${var.drone_commit}"
-        MICRO_PORT=3001
-        BROKER_PORT=3002
-        VAULT_ADDRESS="${var.vault_address}"
-        VAULT_DIR="/vault"
-        STATE_DIR="/state"
-        ZDCLAUDE_REPO="https://github.com/ZeroDoctor/zdclaude"
+        ENV            = "test"
+        APPROLE_ID     = "${var.approle_id}"
+        APPROLE_SECRET = "${var.approle_secret}"
+        GIT_COMMIT     = "${var.drone_commit}"
+        MICRO_PORT     = 3001
+        BROKER_PORT    = 3002
+        VAULT_ADDRESS  = "${var.vault_address}"
+        VAULT_DIR      = "/vault"
+        STATE_DIR      = "/state"
+        ZDCLAUDE_REPO  = "https://github.com/ZeroDoctor/zdclaude"
       }
     }
 
@@ -94,8 +94,8 @@ job "zdai" {
       ]
 
       check {
-        name = "alive"
-        type = "tcp"
+        name     = "alive"
+        type     = "tcp"
         interval = "10s"
         timeout  = "2s"
       }

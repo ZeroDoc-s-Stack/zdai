@@ -1,7 +1,7 @@
 // Pre-filters which agent-harness items are eligible for this dispatch cycle
 // by reading the vault's TaskNotes/Tasks/ directory directly. No MCP server
 // dependency — pure Go file parsing of YAML frontmatter.
-package main
+package services
 
 import (
 	"os"

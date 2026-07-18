@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 const maxLogBytes = 5 * 1024 * 1024 // 5MB
 const maxOutputChars = 4000
 
-func rotateLogIfLarge(logPath string) {
+func RotateLogIfLarge(logPath string) {
 	info, err := os.Stat(logPath)
 	if err != nil || info.Size() < maxLogBytes {
 		return

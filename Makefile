@@ -7,14 +7,14 @@ init:
 
 .PHONY: proto
 proto:
-	@protoc --proto_path=. --micro_out=. --go_out=:. proto/zdai.proto
+	@protoc --proto_path=. --micro_out=. --go_out=:. package/grpc/zdai.proto
 	@# Fix v4→v5 import paths in generated micro file
-	@sed -i 's|go-micro.dev/v4/|go-micro.dev/v5/|g' proto/zdai.pb.micro.go
-	@sed -i '/go-micro.dev\/v4\/api/d' proto/zdai.pb.micro.go
+	@sed -i 's|go-micro.dev/v4/|go-micro.dev/v5/|g' package/grpc/zdai.pb.micro.go
+	@sed -i '/go-micro.dev\/v4\/api/d' package/grpc/zdai.pb.micro.go
 
 .PHONY: build
 build:
-	@go build -o zdai .
+	@go build -o zdai ./cmd/zdai/
 
 .PHONY: run
 run:
@@ -24,6 +24,10 @@ run:
 test:
 	@go vet ./...
 	@go test ./... -cover
+
+.PHONY: deploy
+deploy:
+	nomad job run nomad/zdai.hcl
 
 .PHONY: vendor
 vendor:
