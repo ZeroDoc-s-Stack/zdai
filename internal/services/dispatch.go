@@ -65,27 +65,50 @@ func overrideModel(p persona) persona {
 	return p
 }
 
-func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, effort, provider, logPath string) error {
-	args := []string{
-		"--print",
-		"--dangerously-skip-permissions",
-		"--model", p.model,
-		"--effort", effort,
-		"--agent", p.agent,
-		prompt,
+// opencodeArgs builds the `opencode run` argv for a non-claude model.
+// opencode has no --agent wired to ~/.claude/agents, so the persona is
+// injected via the prompt instead.
+func opencodeArgs(p persona, prompt string) []string {
+	return []string{
+		"run",
+		"--model", "openrouter/" + p.model,
+		fmt.Sprintf("First read ~/.claude/agents/%s.md and adopt that agent persona exactly. Then: %s", p.agent, prompt),
 	}
-	cmd := exec.CommandContext(ctx, claudeBin, args...)
-	cmd.Dir = vaultDir
+}
 
-	env := append(os.Environ(), "ANTHROPIC_BASE_URL="+baseURLForModel(p.model))
-	if provider == "openrouter" {
-		key := os.Getenv("OPENROUTER_API_KEY")
-		if key == "" {
-			return fmt.Errorf("provider=openrouter but OPENROUTER_API_KEY is not set")
+func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, opencodeBin, effort, provider, logPath string) error {
+	var cmd *exec.Cmd
+	binName := "claude"
+	if isClaudeModel(p.model) {
+		args := []string{
+			"--print",
+			"--dangerously-skip-permissions",
+			"--model", p.model,
+			"--effort", effort,
+			"--agent", p.agent,
+			prompt,
 		}
-		env = append(env, "ANTHROPIC_API_KEY="+key)
+		cmd = exec.CommandContext(ctx, claudeBin, args...)
+
+		env := append(os.Environ(), "ANTHROPIC_BASE_URL="+baseURLForModel(p.model))
+		if provider == "openrouter" {
+			key := os.Getenv("OPENROUTER_API_KEY")
+			if key == "" {
+				return fmt.Errorf("provider=openrouter but OPENROUTER_API_KEY is not set")
+			}
+			env = append(env, "ANTHROPIC_API_KEY="+key)
+		}
+		cmd.Env = env
+	} else {
+		// Non-claude models run through opencode, which talks to OpenRouter
+		// directly (picks up OPENROUTER_API_KEY from the environment).
+		binName = "opencode"
+		if os.Getenv("OPENROUTER_API_KEY") == "" {
+			return fmt.Errorf("model %s dispatches via opencode but OPENROUTER_API_KEY is not set", p.model)
+		}
+		cmd = exec.CommandContext(ctx, opencodeBin, opencodeArgs(p, prompt)...)
 	}
-	cmd.Env = env
+	cmd.Dir = vaultDir
 
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -109,7 +132,7 @@ func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, ef
 
 	appendLog(logPath, truncate(out.String(), maxOutputChars), exitCode, duration)
 	if exitCode != 0 {
-		return fmt.Errorf("claude exited %d (agent=%s model=%s)", exitCode, p.agent, p.model)
+		return fmt.Errorf("%s exited %d (agent=%s model=%s)", binName, exitCode, p.agent, p.model)
 	}
 	return nil
 }
@@ -124,7 +147,7 @@ func DispatchTicket(ctx context.Context, path string, vaultDir string, opts Disp
 	p = overrideModel(p)
 	log.Infof("zdai: dispatch ticket %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Execute the ticket at: %s", path)
-	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath)
+	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, opts.Effort, opts.Provider, opts.LogPath)
 }
 
 // dispatchRequest dispatches an agent-request task to the planner persona.
@@ -132,7 +155,7 @@ func dispatchRequest(ctx context.Context, path string, opts DispatchOpts) {
 	p := overrideModel(requestPersona)
 	log.Infof("zdai: dispatch request %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Process the agent-request at: %s", path)
-	if err := invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath); err != nil {
+	if err := invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, opts.Effort, opts.Provider, opts.LogPath); err != nil {
 		log.Errorf("zdai: dispatch request %s: %v", path, err)
 	}
 }

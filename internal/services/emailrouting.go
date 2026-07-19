@@ -357,7 +357,7 @@ func (r *EmailRouter) dispatchUnblockedTicket(ctx context.Context, ticketPath st
 			"last outbound system message. Retrieve and process this reply to continue work.",
 		ticketPath, reply.MessageID, reply.Sender, reply.SentAt.UTC().Format(time.RFC3339),
 	)
-	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.Effort, opts.Provider, opts.LogPath)
+	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, opts.Effort, opts.Provider, opts.LogPath)
 }
 
 // -----------------------------------------------------------------------------
