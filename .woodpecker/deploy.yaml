@@ -1,10 +1,11 @@
 when:
   - event: push
-    branch: [main]
+    branch: [main, release, release/*]
 
 depends_on:
   - test
   - build-amd64
+  - build-arm64
 
 matrix:
   platform:
@@ -14,6 +15,22 @@ labels:
   platform: ${platform}
 
 steps:
+  - name: push
+    image: quay.io/containers/podman
+    environment:
+      DOCKER_USER:
+        from_secret: docker_user
+      DOCKER_PASS:
+        from_secret: docker_pass
+    commands:
+      - podman login reg.internal.zerodoc.dev --username $DOCKER_USER --password $DOCKER_PASS
+      - podman manifest create zerodoc/zdai:${CI_COMMIT_BRANCH}
+        --amend reg.internal.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}-amd64
+        --amend reg.internal.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}-arm64
+      - podman manifest push zerodoc/zdai:${CI_COMMIT_BRANCH}
+        reg.internal.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}
+      - podman manifest inspect zerodoc/zdai:${CI_COMMIT_BRANCH}
+
   - name: deploy
     image: docker.io/loq9/drone-nomad
     privileged: true
@@ -33,3 +50,6 @@ steps:
       PLUGIN_ADDR: http://nomad.service.consul:4646
       PLUGIN_TEMPLATE: nomad/zdai.hcl
       DRONE_COMMIT_SHA: ${CI_COMMIT_SHA:0:8}
+    when:
+      branch:
+      - main
