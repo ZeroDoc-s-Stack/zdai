@@ -4,7 +4,7 @@ when:
 
 matrix:
   platform:
-    - linux/amd64
+    - linux/arm64
 
 labels:
   platform: ${platform}
@@ -28,6 +28,6 @@ steps:
         --build-arg API_USERNAME=$GITHUB_USER
         --build-arg API_TOKEN=$GITHUB_TOKEN
         -t zdai:${CI_COMMIT_BRANCH}-stage .
-      - podman push zdai:${CI_COMMIT_BRANCH}-stage reg.internal.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}-amd64
+      - podman push zdai:${CI_COMMIT_BRANCH}-stage reg.internal.zerodoc.dev/zerodoc/zdai:${CI_COMMIT_BRANCH}-arm64
     volumes:
     - /var/lib/containers:/var/lib/containers
