@@ -12,9 +12,10 @@ import (
 // DispatchOpts carries the runtime parameters for a dispatch cycle.
 // SetOpts() stores the value; GlobalOpts() retrieves it.
 type DispatchOpts struct {
-	VaultDir  string
-	ClaudeBin string
-	Timeout   time.Duration
+	VaultDir    string
+	ClaudeBin   string
+	OpencodeBin string
+	Timeout     time.Duration
 	LogPath   string
 	Model     string
 	Effort    string
@@ -57,7 +58,7 @@ func RunCycle(trigger string) {
 	if cfg.Tess.Enabled {
 		tessLastRun := filepath.Join(filepath.Dir(opts.LogPath), "tess-last-run")
 		if shouldRunTess(cfg.Tess.Schedule, tessLastRun) {
-			if err := runTess(ctx, cfg.Tess, opts.ClaudeBin, opts.VaultDir, opts.LogPath); err != nil {
+			if err := runTess(ctx, cfg.Tess, opts.ClaudeBin, opts.OpencodeBin, opts.VaultDir, opts.LogPath); err != nil {
 				log.Errorf("zdai: tess: %v", err)
 			} else {
 				_ = markTessRan(tessLastRun)

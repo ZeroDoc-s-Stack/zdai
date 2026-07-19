@@ -80,6 +80,40 @@ func lookupEnv(env []string, key string) (string, bool) {
 	return "", false
 }
 
+// TestOpencodeDispatchSelection verifies which models go to opencode vs the
+// claude CLI, and that opencode argv carries the openrouter-prefixed model
+// and persona-injected prompt.
+func TestOpencodeDispatchSelection(t *testing.T) {
+	if isClaudeModel("google/gemini-3.5-flash") || isClaudeModel("haiku") {
+		t.Error("non-claude model classified as claude")
+	}
+	if !isClaudeModel("claude-sonnet-4-6") {
+		t.Error("claude-sonnet-4-6 not classified as claude")
+	}
+
+	args := opencodeArgs(persona{agent: "researcher", model: "google/gemini-3.5-flash"}, "Execute the ticket at: X")
+	if args[0] != "run" {
+		t.Errorf("args[0] = %q, want \"run\"", args[0])
+	}
+	got, ok := lookupFlag(args, "--model")
+	if !ok || got != "openrouter/google/gemini-3.5-flash" {
+		t.Errorf("--model = %q, want openrouter/google/gemini-3.5-flash", got)
+	}
+	prompt := args[len(args)-1]
+	if !strings.Contains(prompt, "researcher.md") || !strings.Contains(prompt, "Execute the ticket at: X") {
+		t.Errorf("prompt missing persona or original task: %q", prompt)
+	}
+}
+
+func lookupFlag(args []string, flag string) (string, bool) {
+	for i, a := range args {
+		if a == flag && i+1 < len(args) {
+			return args[i+1], true
+		}
+	}
+	return "", false
+}
+
 func TestOverrideModel(t *testing.T) {
 	p := persona{agent: "researcher", model: "google/gemini-3.5-flash"}
 

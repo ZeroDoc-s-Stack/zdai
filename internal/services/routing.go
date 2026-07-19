@@ -10,12 +10,17 @@ import "strings"
 const headroomBaseURL = "https://headroom.internal.zerodoc.dev"
 const headroomORBaseURL = "https://headroom-or.internal.zerodoc.dev"
 
-// baseURLForModel picks the headroom endpoint based on model name.
-// Only full claude-* IDs (e.g. "claude-sonnet-4-6", "claude-haiku-4-5-...") go
-// to the direct Anthropic proxy. Short aliases ("haiku", "sonnet") and
-// provider-prefixed names ("google/...", "openai/...") route through headroom-or.
+// isClaudeModel reports whether a model runs via the claude CLI. Only full
+// claude-* IDs (e.g. "claude-sonnet-4-6", "claude-haiku-4-5-...") qualify;
+// everything else (provider-prefixed names like "google/...", short aliases)
+// is dispatched through the opencode CLI against OpenRouter.
+func isClaudeModel(model string) bool {
+	return strings.HasPrefix(model, "claude-")
+}
+
+// baseURLForModel picks the headroom endpoint for a claude CLI invocation.
 func baseURLForModel(model string) string {
-	if strings.HasPrefix(model, "claude-") {
+	if isClaudeModel(model) {
 		return headroomBaseURL
 	}
 	return headroomORBaseURL

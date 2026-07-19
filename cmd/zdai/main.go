@@ -81,6 +81,7 @@ func main() {
 	vaultDir := flag.String("vault-dir", envOr("VAULT_DIR", defaultVaultDir), "Obsidian vault root")
 	stateDir := flag.String("state-dir", envOr("STATE_DIR", ""), "state directory (run.lock, runs.log, zdai-state.json)")
 	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary")
+	opencodeBin := flag.String("opencode-bin", "opencode", "opencode CLI binary (used for non-claude models via OpenRouter)")
 	timeout := flag.Duration("timeout", 15*time.Minute, "max duration per claude invocation")
 	flag.Parse()
 
@@ -126,13 +127,14 @@ func main() {
 	services.RotateLogIfLarge(logPath)
 
 	services.SetOpts(services.DispatchOpts{
-		VaultDir:  *vaultDir,
-		ClaudeBin: *claudeBin,
-		Timeout:   *timeout,
-		LogPath:   logPath,
-		Model:     cfg.Harness.Model,
-		Effort:    cfg.Harness.Effort,
-		Provider:  cfg.Harness.Provider,
+		VaultDir:    *vaultDir,
+		ClaudeBin:   *claudeBin,
+		OpencodeBin: *opencodeBin,
+		Timeout:     *timeout,
+		LogPath:     logPath,
+		Model:       cfg.Harness.Model,
+		Effort:      cfg.Harness.Effort,
+		Provider:    cfg.Harness.Provider,
 	})
 
 	if cfg.EmailRouting.Enabled {
