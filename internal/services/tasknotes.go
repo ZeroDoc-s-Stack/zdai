@@ -167,7 +167,7 @@ func readAgentKind(vaultDir, path string) (string, error) {
 	return kindAgent, nil
 }
 
-// ticketEligible mirrors harness-coordinator eligibility rules.
+// ticketEligible mirrors tess's dispatch-cycle eligibility rules.
 func ticketEligible(agentStatus, taskStatus string) bool {
 	if taskStatus == "needs-rework" {
 		return true
