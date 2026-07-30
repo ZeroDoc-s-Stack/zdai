@@ -65,7 +65,7 @@ job "zdai" {
         ports = ["micro", "broker"]
 
         volumes = [
-          "/mnt/local/syncthing/data1:/vault:rw",
+          "/mnt/local/kb/data1:/vault:rw",
           "/mnt/local/zdai/state:/state",
           "/mnt/local/zdai/claude:/root/.claude",
         ]
