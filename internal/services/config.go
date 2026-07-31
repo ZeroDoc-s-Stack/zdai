@@ -9,6 +9,7 @@ type HarnessConfig struct {
 	Model    string `json:"model"`    // e.g. "claude-haiku-4-5-20251001"
 	Effort   string `json:"effort"`   // "low" | "medium" | "high"
 	Provider string `json:"provider"` // "claude" (default) or "openrouter"
+	Prompt   string `json:"prompt"`   // dispatch prompt sent to tess each cycle; empty disables harness dispatch
 }
 
 type TessConfig struct {

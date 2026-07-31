@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"time"
 
@@ -32,7 +31,7 @@ func GetOpts() DispatchOpts { return _opts }
 
 func globalOpts() DispatchOpts { return _opts }
 
-// RunCycle executes one full dispatch cycle: Tess check + eligible work.
+// RunCycle executes one full dispatch cycle: Tess daily check + harness dispatch via Tess.
 // It is called both by the scheduler and by POST /v1/dispatch.
 func RunCycle(trigger string) {
 	r := Store.Begin(trigger)
@@ -66,28 +65,18 @@ func RunCycle(trigger string) {
 		}
 	}
 
-	requests, tickets, err := eligibleWork(opts.VaultDir)
-	if err != nil {
-		log.Errorf("zdai: eligible work: %v", err)
-		Store.Finish(r, models.RunStatusFailed)
-		return
-	}
-
-	if len(requests) == 0 && len(tickets) == 0 {
-		appendLog(opts.LogPath, "no eligible work this cycle", 0, 0)
-		Store.Finish(r, models.RunStatusDone)
-		return
-	}
-
-	for _, path := range requests {
-		dispatchRequest(ctx, path, opts)
-	}
-	for _, path := range tickets {
-		if err := DispatchTicket(ctx, path, opts.VaultDir, opts); err != nil {
-			log.Errorf("zdai: dispatch %s: %v", path, err)
-			appendLog(opts.LogPath, fmt.Sprintf("skipped %s: %v", path, err), 1, 0)
+	// Harness dispatch: invoke Tess with the configured prompt so it queries Plane and dispatches agents.
+	// ponytail: no eligibleWork() vault scan — TaskNotes/AI/ was retired 2026-07-23; Tess owns Plane querying.
+	if cfg.Harness.Prompt != "" {
+		p := persona{agent: "tess", model: cfg.Harness.Model}
+		p = overrideModel(p)
+		log.Infof("zdai: harness dispatch → agent=tess model=%s", p.model)
+		if err := invokeAgent(ctx, p, cfg.Harness.Prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, cfg.Harness.Effort, cfg.Harness.Provider, opts.LogPath); err != nil {
+			log.Errorf("zdai: harness dispatch: %v", err)
 			status = models.RunStatusFailed
 		}
+	} else {
+		appendLog(opts.LogPath, "harness.prompt not configured; skipping dispatch", 0, 0)
 	}
 
 	Store.Finish(r, status)

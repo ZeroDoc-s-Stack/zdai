@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/zerodoc-s-stack/zdlib/base/logger"
+	"gopkg.in/yaml.v3"
 )
 
 // log is the shared logrus instance for the services package.
@@ -34,9 +37,67 @@ var personaByAgentKind = map[string]persona{
 	"tess":         {"tess", "claude-sonnet-4-6"},
 }
 
-// requestPersona is the persona used for all agent-request tasks regardless
-// of their tags — requests are always handled by the planner.
-var requestPersona = persona{"planner", "claude-haiku-4-5-20251001"}
+// taskFrontmatter holds the subset of fields shared by ticket-reading helpers.
+type taskFrontmatter struct {
+	Status string `yaml:"status"`
+}
+
+// parseFrontmatter extracts the YAML frontmatter from a note file.
+func parseFrontmatter(data []byte) (taskFrontmatter, bool) {
+	s := string(data)
+	if !strings.HasPrefix(s, "---") {
+		return taskFrontmatter{}, false
+	}
+	rest := s[3:]
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return taskFrontmatter{}, false
+	}
+	var fm taskFrontmatter
+	if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
+		return taskFrontmatter{}, false
+	}
+	return fm, true
+}
+
+// readAgentKind reads the agent dispatch hint from a ticket's frontmatter tags.
+// "agent:<name>" (direct persona) takes precedence over "agent-kind:<kind>".
+func readAgentKind(vaultDir, path string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(vaultDir, path))
+	if err != nil {
+		return "", err
+	}
+	s := string(data)
+	if !strings.HasPrefix(s, "---") {
+		return "", nil
+	}
+	rest := s[3:]
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return "", nil
+	}
+	frontmatter := rest[:end]
+
+	var directAgent, kindAgent string
+	for _, line := range strings.Split(frontmatter, "\n") {
+		trimmed := strings.TrimSpace(line)
+		tag, ok := strings.CutPrefix(trimmed, "- ")
+		if !ok {
+			continue
+		}
+		tag = strings.TrimSpace(tag)
+		if v, ok2 := strings.CutPrefix(tag, "agent:"); ok2 && directAgent == "" {
+			directAgent = strings.TrimSpace(v)
+		}
+		if v, ok2 := strings.CutPrefix(tag, "agent-kind:"); ok2 && kindAgent == "" {
+			kindAgent = strings.TrimSpace(v)
+		}
+	}
+	if directAgent != "" {
+		return directAgent, nil
+	}
+	return kindAgent, nil
+}
 
 // resolvePersona returns the persona for a ticket by checking the ticket file's
 // frontmatter for an "agent:<name>" tag (direct persona override) or
@@ -150,12 +211,3 @@ func DispatchTicket(ctx context.Context, path string, vaultDir string, opts Disp
 	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, opts.Effort, opts.Provider, opts.LogPath)
 }
 
-// dispatchRequest dispatches an agent-request task to the planner persona.
-func dispatchRequest(ctx context.Context, path string, opts DispatchOpts) {
-	p := overrideModel(requestPersona)
-	log.Infof("zdai: dispatch request %s → agent=%s model=%s", path, p.agent, p.model)
-	prompt := fmt.Sprintf("Process the agent-request at: %s", path)
-	if err := invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, opts.Effort, opts.Provider, opts.LogPath); err != nil {
-		log.Errorf("zdai: dispatch request %s: %v", path, err)
-	}
-}
