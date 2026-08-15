@@ -40,15 +40,15 @@ func markTessRan(tessLastRunPath string) error {
 	return os.WriteFile(tessLastRunPath, []byte(today), 0o644)
 }
 
-// runTess invokes `claude --agent tess` with the configured Tess prompt.
-func runTess(ctx context.Context, cfg TessConfig, claudeBin, opencodeBin, vaultDir, logPath string) error {
+// runTess invokes opencode with the tess agent persona.
+func runTess(ctx context.Context, cfg TessConfig, opencodeBin, vaultDir, logPath string) error {
 	if cfg.Prompt == "" {
 		return fmt.Errorf("tess.prompt is empty in zdai-state.json")
 	}
 	p := persona{agent: "tess", model: cfg.Model}
 	if p.model == "" {
-		p.model = "claude-sonnet-4-6"
+		p.model = "anthropic/claude-sonnet-4-6"
 	}
 	log.Infof("zdai: tess daily trigger → agent=tess model=%s", p.model)
-	return invokeAgent(ctx, p, cfg.Prompt, vaultDir, claudeBin, opencodeBin, "medium", cfg.Provider, logPath)
+	return invokeAgent(ctx, p, cfg.Prompt, vaultDir, opencodeBin, "medium", logPath)
 }

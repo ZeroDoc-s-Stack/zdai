@@ -80,8 +80,7 @@ func loadEnv() {
 func main() {
 	vaultDir := flag.String("vault-dir", envOr("VAULT_DIR", defaultVaultDir), "Obsidian vault root")
 	stateDir := flag.String("state-dir", envOr("STATE_DIR", ""), "state directory (run.lock, runs.log, zdai-state.json)")
-	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary")
-	opencodeBin := flag.String("opencode-bin", "opencode", "opencode CLI binary (used for non-claude models via OpenRouter)")
+	opencodeBin := flag.String("opencode-bin", "opencode", "opencode CLI binary")
 	timeout := flag.Duration("timeout", 15*time.Minute, "max duration per claude invocation")
 	flag.Parse()
 
@@ -128,7 +127,6 @@ func main() {
 
 	services.SetOpts(services.DispatchOpts{
 		VaultDir:    *vaultDir,
-		ClaudeBin:   *claudeBin,
 		OpencodeBin: *opencodeBin,
 		Timeout:     *timeout,
 		LogPath:     logPath,

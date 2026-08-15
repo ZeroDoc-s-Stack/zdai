@@ -12,13 +12,12 @@ import (
 // SetOpts() stores the value; GlobalOpts() retrieves it.
 type DispatchOpts struct {
 	VaultDir    string
-	ClaudeBin   string
 	OpencodeBin string
 	Timeout     time.Duration
-	LogPath   string
-	Model     string
-	Effort    string
-	Provider  string
+	LogPath  string
+	Model    string
+	Effort   string
+	Provider string
 }
 
 var _opts DispatchOpts
@@ -57,7 +56,7 @@ func RunCycle(trigger string) {
 	if cfg.Tess.Enabled {
 		tessLastRun := filepath.Join(filepath.Dir(opts.LogPath), "tess-last-run")
 		if shouldRunTess(cfg.Tess.Schedule, tessLastRun) {
-			if err := runTess(ctx, cfg.Tess, opts.ClaudeBin, opts.OpencodeBin, opts.VaultDir, opts.LogPath); err != nil {
+			if err := runTess(ctx, cfg.Tess, opts.OpencodeBin, opts.VaultDir, opts.LogPath); err != nil {
 				log.Errorf("zdai: tess: %v", err)
 			} else {
 				_ = markTessRan(tessLastRun)
@@ -71,7 +70,7 @@ func RunCycle(trigger string) {
 		p := persona{agent: "tess", model: cfg.Harness.Model}
 		p = overrideModel(p)
 		log.Infof("zdai: harness dispatch → agent=tess model=%s", p.model)
-		if err := invokeAgent(ctx, p, cfg.Harness.Prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, cfg.Harness.Effort, cfg.Harness.Provider, opts.LogPath); err != nil {
+		if err := invokeAgent(ctx, p, cfg.Harness.Prompt, opts.VaultDir, opts.OpencodeBin, cfg.Harness.Effort, opts.LogPath); err != nil {
 			log.Errorf("zdai: harness dispatch: %v", err)
 			status = models.RunStatusFailed
 		}

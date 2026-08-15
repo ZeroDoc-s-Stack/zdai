@@ -26,15 +26,17 @@ type persona struct {
 
 // personaByAgentKind maps the agent-kind tag value to the Claude persona and
 // model to use. Mirrors the dispatch table in Projects/ZDProject/zdharness.md.
+// Model strings carry the full opencode provider prefix: anthropic/* goes
+// direct to Anthropic; openrouter/* routes through OpenRouter.
 var personaByAgentKind = map[string]persona{
-	"coding":       {"developer", "claude-sonnet-4-6"},
-	"api-consumer": {"developer", "claude-sonnet-4-6"},
-	"research":     {"researcher", "google/gemini-3.5-flash"},
-	"general":      {"researcher", "google/gemini-3.5-flash"},
-	"audit":        {"auditor", "google/gemini-pro-latest"},
-	"qa":           {"qa", "claude-haiku-4-5-20251001"},
-	"sre":          {"sre", "google/gemini-3.5-flash"},
-	"tess":         {"tess", "claude-sonnet-4-6"},
+	"coding":       {"developer", "anthropic/claude-sonnet-4-6"},
+	"api-consumer": {"developer", "anthropic/claude-sonnet-4-6"},
+	"research":     {"researcher", "openrouter/google/gemini-3.5-flash"},
+	"general":      {"researcher", "openrouter/google/gemini-3.5-flash"},
+	"audit":        {"auditor", "openrouter/google/gemini-pro-latest"},
+	"qa":           {"qa", "anthropic/claude-haiku-4-5-20251001"},
+	"sre":          {"sre", "openrouter/google/gemini-3.5-flash"},
+	"tess":         {"tess", "anthropic/claude-sonnet-4-6"},
 }
 
 // taskFrontmatter holds the subset of fields shared by ticket-reading helpers.
@@ -113,7 +115,7 @@ func resolvePersona(vaultDir, path string) (persona, bool) {
 	}
 	// Direct persona name not in the table (e.g. a custom agent); construct
 	// with a safe default model so the invocation still proceeds.
-	return persona{agent: kind, model: "claude-sonnet-4-6"}, true
+	return persona{agent: kind, model: "anthropic/claude-sonnet-4-6"}, true
 }
 
 // overrideModel applies the ZDAI_MODEL_OVERRIDE env var, forcing every
@@ -126,49 +128,23 @@ func overrideModel(p persona) persona {
 	return p
 }
 
-// opencodeArgs builds the `opencode run` argv for a non-claude model.
+// opencodeArgs builds the `opencode run` argv for a given persona.
 // opencode has no --agent wired to ~/.claude/agents, so the persona is
-// injected via the prompt instead.
+// injected via the prompt instead. Model strings already carry provider prefix
+// (e.g. "anthropic/claude-sonnet-4-6", "openrouter/google/gemini-3.5-flash").
 func opencodeArgs(p persona, prompt string) []string {
 	return []string{
 		"run",
-		"--model", "openrouter/" + p.model,
+		"--model", p.model,
 		fmt.Sprintf("First read ~/.claude/agents/%s.md and adopt that agent persona exactly. Then: %s", p.agent, prompt),
 	}
 }
 
-func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, opencodeBin, effort, provider, logPath string) error {
-	var cmd *exec.Cmd
-	binName := "claude"
-	if isClaudeModel(p.model) {
-		args := []string{
-			"--print",
-			"--dangerously-skip-permissions",
-			"--model", p.model,
-			"--effort", effort,
-			"--agent", p.agent,
-			prompt,
-		}
-		cmd = exec.CommandContext(ctx, claudeBin, args...)
-
-		env := append(os.Environ(), "ANTHROPIC_BASE_URL="+baseURLForModel(p.model))
-		if provider == "openrouter" {
-			key := os.Getenv("OPENROUTER_API_KEY")
-			if key == "" {
-				return fmt.Errorf("provider=openrouter but OPENROUTER_API_KEY is not set")
-			}
-			env = append(env, "ANTHROPIC_API_KEY="+key)
-		}
-		cmd.Env = env
-	} else {
-		// Non-claude models run through opencode, which talks to OpenRouter
-		// directly (picks up OPENROUTER_API_KEY from the environment).
-		binName = "opencode"
-		if os.Getenv("OPENROUTER_API_KEY") == "" {
-			return fmt.Errorf("model %s dispatches via opencode but OPENROUTER_API_KEY is not set", p.model)
-		}
-		cmd = exec.CommandContext(ctx, opencodeBin, opencodeArgs(p, prompt)...)
-	}
+func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, opencodeBin, effort, logPath string) error {
+	// All models route through opencode. anthropic/* goes direct to Anthropic;
+	// openrouter/* routes through OpenRouter. opencode picks up ANTHROPIC_API_KEY
+	// and OPENROUTER_API_KEY from the environment automatically.
+	cmd := exec.CommandContext(ctx, opencodeBin, opencodeArgs(p, prompt)...)
 	cmd.Dir = vaultDir
 
 	var out bytes.Buffer
@@ -193,7 +169,7 @@ func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, claudeBin, op
 
 	appendLog(logPath, truncate(out.String(), maxOutputChars), exitCode, duration)
 	if exitCode != 0 {
-		return fmt.Errorf("%s exited %d (agent=%s model=%s)", binName, exitCode, p.agent, p.model)
+		return fmt.Errorf("opencode exited %d (agent=%s model=%s)", exitCode, p.agent, p.model)
 	}
 	return nil
 }
@@ -208,6 +184,6 @@ func DispatchTicket(ctx context.Context, path string, vaultDir string, opts Disp
 	p = overrideModel(p)
 	log.Infof("zdai: dispatch ticket %s → agent=%s model=%s", path, p.agent, p.model)
 	prompt := fmt.Sprintf("Execute the ticket at: %s", path)
-	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.ClaudeBin, opts.OpencodeBin, opts.Effort, opts.Provider, opts.LogPath)
+	return invokeAgent(ctx, p, prompt, opts.VaultDir, opts.OpencodeBin, opts.Effort, opts.LogPath)
 }
 
