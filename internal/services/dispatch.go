@@ -123,7 +123,7 @@ func resolvePersona(vaultDir, path string) (persona, bool) {
 // models the proxy can't serve (e.g. the google/gemini-* entries).
 func overrideModel(p persona) persona {
 	if m := os.Getenv("ZDAI_MODEL_OVERRIDE"); m != "" {
-		p.model = m
+		p.model = normalizeModel(m)
 	}
 	return p
 }

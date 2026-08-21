@@ -21,22 +21,36 @@ func TestLoadState_HarnessPrompt(t *testing.T) {
 			name:       "prompt set",
 			json:       `{"harness":{"prompt":"Run the harness dispatch cycle."}}`,
 			wantPrompt: "Run the harness dispatch cycle.",
-			wantModel:  "claude-haiku-4-5-20251001", // default
-			wantEffort: "medium",                    // default
+			wantModel:  "anthropic/claude-haiku-4-5-20251001", // default, normalized
+			wantEffort: "medium",                              // default
 		},
 		{
 			name:       "prompt empty — dispatch disabled",
 			json:       `{"harness":{}}`,
 			wantPrompt: "",
-			wantModel:  "claude-haiku-4-5-20251001",
+			wantModel:  "anthropic/claude-haiku-4-5-20251001", // default, normalized
 			wantEffort: "medium",
 		},
 		{
-			name:       "explicit model and effort",
+			name:       "bare claude-* model is normalized",
 			json:       `{"harness":{"model":"claude-sonnet-4-6","effort":"high","prompt":"dispatch"}}`,
 			wantPrompt: "dispatch",
-			wantModel:  "claude-sonnet-4-6",
+			wantModel:  "anthropic/claude-sonnet-4-6",
 			wantEffort: "high",
+		},
+		{
+			name:       "already-prefixed model passes through",
+			json:       `{"harness":{"model":"anthropic/claude-sonnet-4-6","prompt":"dispatch"}}`,
+			wantPrompt: "dispatch",
+			wantModel:  "anthropic/claude-sonnet-4-6",
+			wantEffort: "medium",
+		},
+		{
+			name:       "openrouter model passes through unchanged",
+			json:       `{"harness":{"model":"openrouter/google/gemini-3.5-flash","prompt":"dispatch"}}`,
+			wantPrompt: "dispatch",
+			wantModel:  "openrouter/google/gemini-3.5-flash",
+			wantEffort: "medium",
 		},
 	}
 
@@ -69,7 +83,7 @@ func TestLoadState_HarnessPrompt(t *testing.T) {
 func TestLoadState_RoundTrip(t *testing.T) {
 	original := ZdaiState{
 		Harness: HarnessConfig{
-			Model:    "claude-sonnet-4-6",
+			Model:    "anthropic/claude-sonnet-4-6", // already normalized; round-trip must be stable
 			Effort:   "high",
 			Provider: "openrouter",
 			Prompt:   "Run the harness dispatch cycle via Tess.",
