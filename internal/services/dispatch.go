@@ -29,14 +29,14 @@ type persona struct {
 // Model strings carry the full opencode provider prefix: anthropic/* goes
 // direct to Anthropic; openrouter/* routes through OpenRouter.
 var personaByAgentKind = map[string]persona{
-	"coding":       {"developer", "anthropic/claude-sonnet-4-6"},
-	"api-consumer": {"developer", "anthropic/claude-sonnet-4-6"},
+	"coding":       {"developer", "openrouter/anthropic/claude-sonnet-4.6"},
+	"api-consumer": {"developer", "openrouter/anthropic/claude-sonnet-4.6"},
 	"research":     {"researcher", "openrouter/google/gemini-3.5-flash"},
 	"general":      {"researcher", "openrouter/google/gemini-3.5-flash"},
-	"audit":        {"auditor", "openrouter/google/gemini-pro-latest"},
-	"qa":           {"qa", "anthropic/claude-haiku-4-5-20251001"},
+	"audit":        {"auditor", "openrouter/~google/gemini-pro-latest"},
+	"qa":           {"qa", "openrouter/anthropic/claude-haiku-4.5"},
 	"sre":          {"sre", "openrouter/google/gemini-3.5-flash"},
-	"tess":         {"tess", "anthropic/claude-sonnet-4-6"},
+	"tess":         {"tess", "openrouter/anthropic/claude-sonnet-4.6"},
 }
 
 // taskFrontmatter holds the subset of fields shared by ticket-reading helpers.
@@ -115,7 +115,7 @@ func resolvePersona(vaultDir, path string) (persona, bool) {
 	}
 	// Direct persona name not in the table (e.g. a custom agent); construct
 	// with a safe default model so the invocation still proceeds.
-	return persona{agent: kind, model: "anthropic/claude-sonnet-4-6"}, true
+	return persona{agent: kind, model: "openrouter/anthropic/claude-sonnet-4.6"}, true
 }
 
 // overrideModel applies the ZDAI_MODEL_OVERRIDE env var, forcing every

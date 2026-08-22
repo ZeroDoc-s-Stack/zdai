@@ -21,14 +21,14 @@ func TestLoadState_HarnessPrompt(t *testing.T) {
 			name:       "prompt set",
 			json:       `{"harness":{"prompt":"Run the harness dispatch cycle."}}`,
 			wantPrompt: "Run the harness dispatch cycle.",
-			wantModel:  "anthropic/claude-haiku-4-5-20251001", // default, normalized
+			wantModel:  "openrouter/anthropic/claude-haiku-4.5", // default
 			wantEffort: "medium",                              // default
 		},
 		{
 			name:       "prompt empty — dispatch disabled",
 			json:       `{"harness":{}}`,
 			wantPrompt: "",
-			wantModel:  "anthropic/claude-haiku-4-5-20251001", // default, normalized
+			wantModel:  "openrouter/anthropic/claude-haiku-4.5", // default
 			wantEffort: "medium",
 		},
 		{

@@ -47,7 +47,7 @@ func runTess(ctx context.Context, cfg TessConfig, opencodeBin, vaultDir, logPath
 	}
 	p := persona{agent: "tess", model: cfg.Model}
 	if p.model == "" {
-		p.model = "anthropic/claude-sonnet-4-6"
+		p.model = "openrouter/anthropic/claude-sonnet-4.6"
 	}
 	log.Infof("zdai: tess daily trigger → agent=tess model=%s", p.model)
 	return invokeAgent(ctx, p, cfg.Prompt, vaultDir, opencodeBin, "medium", logPath)

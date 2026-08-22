@@ -7,7 +7,7 @@ import (
 )
 
 type HarnessConfig struct {
-	Model    string `json:"model"`    // e.g. "anthropic/claude-haiku-4-5-20251001"
+	Model    string `json:"model"`    // e.g. "openrouter/anthropic/claude-haiku-4.5"
 	Effort   string `json:"effort"`   // "low" | "medium" | "high"
 	Provider string `json:"provider"` // "claude" (default) or "openrouter"
 	Prompt   string `json:"prompt"`   // dispatch prompt sent to tess each cycle; empty disables harness dispatch
@@ -32,9 +32,11 @@ type ZdaiState struct {
 	EmailRouting EmailRoutingConfig `json:"email_routing"`
 }
 
-// normalizeModel prefixes bare claude-* names with "anthropic/" so opencode
-// receives a provider-qualified model string. Already-prefixed strings (contain
-// "/") and non-claude names pass through unchanged.
+// normalizeModel is a last-resort fallback: prefixes bare claude-* names with
+// "anthropic/" so opencode receives a provider-qualified string. Production
+// paths should never reach here — the persona table and state defaults already
+// carry full openrouter/ prefixes. Dot-format version normalization
+// (e.g. "4-6" → "4.6") is intentionally omitted; fix the caller, not this.
 // ponytail: one guard here covers harness + tess; no per-call-site patches needed.
 func normalizeModel(m string) string {
 	if !strings.Contains(m, "/") && strings.HasPrefix(m, "claude-") {
@@ -53,7 +55,7 @@ func LoadState(path string) (ZdaiState, error) {
 		return ZdaiState{}, err
 	}
 	if s.Harness.Model == "" {
-		s.Harness.Model = "claude-haiku-4-5-20251001"
+		s.Harness.Model = "openrouter/anthropic/claude-haiku-4.5"
 	}
 	if s.Harness.Effort == "" {
 		s.Harness.Effort = "medium"
