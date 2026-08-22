@@ -68,9 +68,7 @@ job "zdai" {
         # entrypoint clones zdclaude (first run) + zdscripts (every start)
         GITHUB_TOKEN = "${github_token}"
 
-        # ponytail: force all dispatches onto claude until the proxy serves the
-        # gemini personas; remove to fall back to the persona table models
-        ZDAI_MODEL_OVERRIDE = "claude-sonnet-4-6"
+        ANTHROPIC_API_KEY = "${anthropic_api_key}"
       }
     }
 
