@@ -68,7 +68,7 @@ job "zdai" {
         # entrypoint clones zdclaude (first run) + zdscripts (every start)
         GITHUB_TOKEN = "${github_token}"
 
-        ANTHROPIC_API_KEY = "${anthropic_api_key}"
+        OPENROUTER_API_KEY = "${openrouter_api_key}"
       }
     }
 
