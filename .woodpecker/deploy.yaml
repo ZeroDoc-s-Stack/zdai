@@ -47,6 +47,8 @@ steps:
         from_secret: vault_address
       github_token:
         from_secret: github_token
+      anthropic_api_key:
+        from_secret: anthropic_api_key
       PLUGIN_ADDR: http://nomad.service.consul:4646
       PLUGIN_TEMPLATE: nomad/zdai.hcl
       DRONE_COMMIT_SHA: ${CI_COMMIT_SHA:0:8}
