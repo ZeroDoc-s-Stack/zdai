@@ -46,4 +46,22 @@ if [ ! -d "${SCRIPTS_DIR}" ] && [ -n "${GITHUB_TOKEN}" ]; then
         echo "zdai: WARN zdscripts clone failed — vault-agent.sh unavailable" >&2
 fi
 
+# Write opencode provider config from env (opencode doesn't read OPENROUTER_API_KEY directly)
+if [ -n "$OPENROUTER_API_KEY" ]; then
+    mkdir -p /root/.config/opencode
+    cat > /root/.config/opencode/opencode.jsonc << OCEOF
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "openrouter": {
+      "apiKey": "${OPENROUTER_API_KEY}"
+    }
+  },
+  "model": {
+    "small": "openrouter/anthropic/claude-haiku-4.5"
+  }
+}
+OCEOF
+fi
+
 exec /usr/local/bin/zdai "$@"
