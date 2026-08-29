@@ -45,8 +45,13 @@ steps:
         from_secret: zdai_secret
       vault_address:
         from_secret: vault_address
+      # This becomes the container's runtime GITHUB_TOKEN (entrypoint.sh
+      # clones github.com/ZeroDoctor/{zdclaude,zdscripts} — personal-account
+      # repos). Deliberately a different secret from test/build's
+      # `github_token`, which needs org access to fetch the private
+      # ZeroDoc-s-Stack/zdlib Go module — one PAT can't cover both scopes.
       github_token:
-        from_secret: github_token
+        from_secret: zdai_runtime_github_token
       openrouter_api_key:
         from_secret: openrouter_api_key
       PLUGIN_ADDR: http://nomad.service.consul:4646
