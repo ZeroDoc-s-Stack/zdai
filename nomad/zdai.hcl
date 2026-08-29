@@ -54,6 +54,17 @@ job "zdai" {
         ]
       }
 
+      # No resources block previously → Nomad's bare default (300 MB / 100 MHz)
+      # applied. opencode's Bun runtime alone routinely exceeds 300 MB doing
+      # real agent turns (tool calls, file edits), so every dispatch cycle was
+      # OOM-killed under cgroup memory.max — surfacing as an "AI_APICallError:
+      # Missing Authentication header" from opencode rather than a clean OOM
+      # signal. vp0dune has 31 GiB free; 1024 MB is ample headroom.
+      resources {
+        cpu    = 500
+        memory = 1024
+      }
+
       env {
         ENV            = "prod"
         APPROLE_ID     = "${approle_id}"
