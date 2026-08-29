@@ -140,38 +140,60 @@ func opencodeArgs(p persona, prompt string) []string {
 	}
 }
 
+// invokeAgentAttempts/invokeAgentRetryDelay: opencode intermittently drops
+// its outbound Authorization header on the very first request of a freshly
+// spawned process when invoked as zdai's own child (never reproduced when
+// invoking opencode by hand in the same container) — surfaces as a clean
+// "AI_APICallError: Missing Authentication header". A short retry clears it
+// reliably in practice, and is cheap relative to a whole dispatch cycle
+// silently doing nothing.
+const invokeAgentAttempts = 3
+const invokeAgentRetryDelay = 5 * time.Second
+
 func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, opencodeBin, effort, logPath string) error {
 	// All models route through opencode. anthropic/* goes direct to Anthropic;
 	// openrouter/* routes through OpenRouter. opencode picks up ANTHROPIC_API_KEY
 	// and OPENROUTER_API_KEY from the environment automatically.
-	cmd := exec.CommandContext(ctx, opencodeBin, opencodeArgs(p, prompt)...)
-	cmd.Dir = vaultDir
+	var lastErr error
+	for attempt := 1; attempt <= invokeAgentAttempts; attempt++ {
+		cmd := exec.CommandContext(ctx, opencodeBin, opencodeArgs(p, prompt)...)
+		cmd.Dir = vaultDir
 
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
 
-	start := time.Now()
-	runErr := cmd.Run()
-	duration := time.Since(start)
+		start := time.Now()
+		runErr := cmd.Run()
+		duration := time.Since(start)
 
-	exitCode := 0
-	if ctx.Err() == context.DeadlineExceeded {
-		exitCode = 124
-	} else if runErr != nil {
-		var exitErr *exec.ExitError
-		if errors.As(runErr, &exitErr) {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = 1
+		exitCode := 0
+		if ctx.Err() == context.DeadlineExceeded {
+			exitCode = 124
+		} else if runErr != nil {
+			var exitErr *exec.ExitError
+			if errors.As(runErr, &exitErr) {
+				exitCode = exitErr.ExitCode()
+			} else {
+				exitCode = 1
+			}
+		}
+
+		appendLog(logPath, truncate(out.String(), maxOutputChars), exitCode, duration)
+		if exitCode == 0 {
+			return nil
+		}
+
+		lastErr = fmt.Errorf("opencode exited %d (agent=%s model=%s)", exitCode, p.agent, p.model)
+		if attempt < invokeAgentAttempts {
+			select {
+			case <-ctx.Done():
+				return lastErr
+			case <-time.After(invokeAgentRetryDelay):
+			}
 		}
 	}
-
-	appendLog(logPath, truncate(out.String(), maxOutputChars), exitCode, duration)
-	if exitCode != 0 {
-		return fmt.Errorf("opencode exited %d (agent=%s model=%s)", exitCode, p.agent, p.model)
-	}
-	return nil
+	return lastErr
 }
 
 // DispatchTicket reads the ticket's agent-kind tag, resolves the persona, and
