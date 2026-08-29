@@ -25,6 +25,7 @@ steps:
     commands:
       - podman login reg.internal.zerodoc.dev --username $DOCKER_USER --password $DOCKER_PASS
       - podman build
+        --no-cache
         --build-arg API_USERNAME=$GITHUB_USER
         --build-arg API_TOKEN=$GITHUB_TOKEN
         -t zdai:${CI_COMMIT_BRANCH}-stage .
