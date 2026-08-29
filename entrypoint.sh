@@ -57,7 +57,17 @@ if [ -n "$OPENROUTER_API_KEY" ]; then
       "apiKey": "${OPENROUTER_API_KEY}"
     }
   },
-  "small_model": "openrouter/anthropic/claude-haiku-4.5"
+  "small_model": "openrouter/anthropic/claude-haiku-4.5",
+  // opencode's auto session-title call races its own provider-auth setup on
+  // startup; when it loses that race (Missing Authentication header) the
+  // whole opencode run process dies silently before ever attempting the
+  // real agent turn. zdai doesn't use session titles, so disable it outright
+  // rather than tolerate an intermittent crash on every dispatch cycle.
+  "agent": {
+    "title": {
+      "disable": true
+    }
+  }
 }
 OCEOF
 fi
