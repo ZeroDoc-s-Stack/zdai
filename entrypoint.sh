@@ -57,9 +57,7 @@ if [ -n "$OPENROUTER_API_KEY" ]; then
       "apiKey": "${OPENROUTER_API_KEY}"
     }
   },
-  "model": {
-    "small": "openrouter/anthropic/claude-haiku-4.5"
-  }
+  "small_model": "openrouter/anthropic/claude-haiku-4.5"
 }
 OCEOF
 fi
