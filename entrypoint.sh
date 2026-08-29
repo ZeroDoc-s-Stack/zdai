@@ -51,7 +51,7 @@ if [ -n "$OPENROUTER_API_KEY" ]; then
     mkdir -p /root/.config/opencode
     cat > /root/.config/opencode/opencode.jsonc << OCEOF
 {
-  "$schema": "https://opencode.ai/config.json",
+  "\$schema": "https://opencode.ai/config.json",
   "provider": {
     "openrouter": {
       "apiKey": "${OPENROUTER_API_KEY}"
