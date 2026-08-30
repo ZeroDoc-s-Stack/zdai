@@ -154,9 +154,17 @@ func invokeAgent(ctx context.Context, p persona, prompt, vaultDir, opencodeBin, 
 	// All models route through opencode. anthropic/* goes direct to Anthropic;
 	// openrouter/* routes through OpenRouter. opencode picks up ANTHROPIC_API_KEY
 	// and OPENROUTER_API_KEY from the environment automatically.
+	//
+	// Invoked through `sh -c 'exec "$0" "$@"'` rather than execing opencodeBin
+	// directly — every manual reproduction of the "Missing Authentication
+	// header" bug went through a shell (interactively or via `podman exec`),
+	// while every failure so far was zdai's own direct exec.Command call.
+	// Testing whether that's the actual structural difference. `$0`/`$@`
+	// keep argv intact with no re-parsing, so the prompt never needs escaping.
 	var lastErr error
 	for attempt := 1; attempt <= invokeAgentAttempts; attempt++ {
-		cmd := exec.CommandContext(ctx, opencodeBin, opencodeArgs(p, prompt)...)
+		shArgs := append([]string{"-c", `exec "$0" "$@"`, opencodeBin}, opencodeArgs(p, prompt)...)
+		cmd := exec.CommandContext(ctx, "/bin/sh", shArgs...)
 		cmd.Dir = vaultDir
 
 		var out bytes.Buffer
